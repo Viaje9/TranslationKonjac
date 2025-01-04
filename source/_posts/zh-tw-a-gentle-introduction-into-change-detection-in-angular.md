@@ -27,7 +27,7 @@ tags:
 
 這是實作方式：
 
-```
+```typescript
 @Component({
     selector: 'my-app',
     template: `
@@ -113,8 +113,7 @@ Angular 中的每個元件都有一個包含 HTML 元素的模板。當 Angular 
 
 為了防止錯誤，我們需要確保在變更偵測執行期間和後續檢查中，表達式回傳的值相同。在我們的案例中，我們可以像這樣將評估部分移出 `time` getter：
 
-```
-
+```typescript
 export class AppComponent {
     _time;
     get time() {  return this._time; }
@@ -127,7 +126,7 @@ export class AppComponent {
 
 但是，使用此實作，getter `time` 的值將始終相同。我們仍然需要更新該值。我們稍早了解到，產生錯誤的檢查會在變更偵測週期後 **同步** 執行。因此，如果我們 **非同步地** 更新它，我們將避免錯誤。因此，為了每毫秒更新一次值，我們可以使用 `setInterval` 函式，並將延遲設定為 `1` 毫秒，如下所示：
 
-```
+```typescript
 export class AppComponent {
     _time;
     get time() {  return this._time; }
@@ -157,7 +156,7 @@ export class AppComponent {
 
 這是實作方法，它會注入 `NgZone` 並在 Angular zone 外部執行 `setInterval`：
 
-```
+```typescript
 export class AppComponent {
     _time;
     get time() {
@@ -196,7 +195,7 @@ export class AppComponent {
 
 我們剛剛了解到，由於單向資料流限制，你不能在檢查元件後，在變更偵測期間變更元件的某些屬性。最常見的情況是，當 Angular 對子元件執行變更偵測時，此更新是透過共用服務或同步事件廣播來進行的。但是，也可以將父元件直接注入到子元件中，並在生命週期鉤子中更新父元件狀態。以下是一些演示此操作的程式碼：
 
-```
+```typescript
 @Component({
     selector: 'my-app',
     template: `
@@ -227,7 +226,7 @@ export class ChildComponent {
 
 但是，有趣的部分來了。如果我現在變更鉤子會怎樣？比如說，改成 `ngOnInit`。你認為我們還會看到錯誤嗎？
 
-```
+```typescript
 export class ChildComponent {
     constructor(private parent: AppComponent) {}
 
@@ -241,7 +240,7 @@ export class ChildComponent {
 
 為了理解此行為，我們需要知道 Angular 在變更偵測期間執行的操作及其順序。而且，我們已經知道可以在哪裡找到它們：我先前向你展示的 `checkAndUpdateView` 函式。以下是你在函式主體中可以找到的部分程式碼：
 
-```
+```typescript
 function checkAndUpdateView(view, ...) {
     ...       
     // update input bindings on child views (components) & directives,
@@ -262,7 +261,7 @@ function checkAndUpdateView(view, ...) {
 
 如你所見，Angular 還會在變更偵測過程中觸發生命週期鉤子。\*\*\*\*有趣的是，某些鉤子是在 Angular 處理綁定時的渲染部分之前呼叫，而某些鉤子是在渲染部分之後呼叫。\*\*\*\*這是展示當 Angular 為父元件執行變更偵測時會發生什麼的圖表：
 
-![Image 32](https://wp.angular.love/wp-content/uploads/2024/07/content-image8-141.png)
+![](https://wp.angular.love/wp-content/uploads/2024/07/content-image8-141.png)
 
 讓我們逐步了解它。首先，它會更新 **子** 元件的輸入綁定。然後，它會在 **子** 元件上呼叫 `OnInit`、`DoCheck` 和 `OnChanges` 鉤子。這是有道理的，因為它剛剛更新了輸入綁定，並且 Angular 需要通知子元件輸入綁定已初始化。**然後，Angular 會對目前元件執行渲染。** 之後，它會對子元件執行變更偵測。這表示它基本上會對子視圖重複這些操作。最後，它會在 **子** 元件上呼叫 `AfterViewChecked` 和 `AfterViewInit` 鉤子，以告知它已被檢查。
 
