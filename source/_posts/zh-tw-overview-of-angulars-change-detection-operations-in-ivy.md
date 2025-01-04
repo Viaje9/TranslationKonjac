@@ -24,7 +24,7 @@ tags:
 
 當檢查一個元件時，Angular 會執行一些其他操作。我們可以透過探索 [refreshView](https://github.com/angular/angular/blob/02f3d12a0dc2c1b6f5ae06fff019058036fa5edc/packages/core/src/render3/instructions/shared.ts#L357%3E) 函式來識別它們。一個經過簡化的函式主體，附帶我的解釋性註解如下所示：
 
-```
+```javascript
 function refreshView(tView, lView, templateFn, context) {
   enterView(lView);
 
