@@ -49,14 +49,14 @@ Angular 有一堆高階概念來操作 view。我[在這裡](https://hackernoon.
 
 這個 `viewRef` 就是你可以使用 `ChangeDetectorRef` token 注入到 component 建構函式中的內容：
 
-```
+```typescript
 export class AppComponent {
     constructor(cd: ChangeDetectorRef) { ... }
 ```
 
 從這個類別的定義中可以看出：
 
-```
+```typescript
 export declare abstract class ChangeDetectorRef {
     abstract checkNoChanges(): void;
     abstract detach(): void;
@@ -185,7 +185,7 @@ detach(): void { this._view.state &= ~ViewState.ChecksEnabled; }
 
 讓我們看看如何在程式碼中使用它：
 
-```
+```typescript
 export class AComponent {
   constructor(public cd: ChangeDetectorRef) {
     this.cd.detach();
@@ -198,7 +198,7 @@ export class AComponent {
 
 這裡有兩件事要注意 — 第一件事是，即使我們變更了 `AComponent` 的狀態，它的所有子 component 也都不會被檢查。第二件事是，由於不會為左分支 component 執行任何變更偵測，因此其範本中的 DOM 也將不會更新。以下是一個小範例來說明：
 
-```
+```typescript
 @Component({
   selector: 'a-comp',
   template: `<span>看看我是否改變：{{changed}}</span>`
@@ -220,7 +220,7 @@ export class AComponent {
 
 如本文第一部分所示，如果 `AppComponent` 上輸入繫結 `aProp` 發生變更，則仍然會為 `AComponent` 觸發 `OnChanges` 生命周期 Hook。這表示，一旦我們收到輸入屬性發生變更的通知，就可以啟用目前 component 的變更偵測以執行變更偵測，並在下一個 tick 時分離它。以下是示範這一點的程式碼片段：
 
-```
+```typescript
 export class AComponent {
   @Input() inputAProp;
 
@@ -266,7 +266,7 @@ while (currView) {
 
 這什麼時候有用？就像 `ngOnChanges` 一樣，即使 component 使用 `OnPush` 策略，也會觸發 `ngDoCheck` 生命周期 Hook。同樣，它僅會為停用分支中最上層的 component 觸發，而不是為停用分支中的每個 component 觸發。但是，我們可以透過這個 Hook 執行自訂邏輯，並將我們的 component 標示為符合一次變更偵測週期的執行條件。由於 Angular 僅檢查物件參考，我們可能會實作某些物件屬性的髒檢查：
 
-```
+```typescript
 Component({
    ...,
    changeDetection: ChangeDetectionStrategy.OnPush
@@ -292,7 +292,7 @@ MyComponent {
 
 有一種方法可以為目前 component 及其所有子 component [執行變更偵測] ****一次****。這是使用 `detectChanges` [方法](https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/refs.ts#L239) 完成的。此方法會針對目前 component view 執行變更偵測，無論其狀態為何，這表示對於目前 view，檢查可能會保持停用狀態，並且在後續的常規變更偵測執行期間不會檢查 component。以下是一個範例：
 
-```
+```typescript
 export class AComponent {
   @Input() inputAProp;
 
