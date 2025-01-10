@@ -100,7 +100,7 @@ export abstract class ViewRef extends ChangeDetectorRef {
 
 另一個有趣的觀察是，子 component view 的狀態可以在變更偵測期間變更。我之前提到，所有 component view 預設都會使用 `ChecksEnabled` 初始化，但是對於所有使用 `OnPush` 策略的 component，變更偵測會在第一次檢查後停用（列表中的操作 9）：
 
-```
+```typescript
 if (view.def.flags & ViewFlags.OnPush) {
   view.state &= ~ViewState.ChecksEnabled;
 }
@@ -108,7 +108,7 @@ if (view.def.flags & ViewFlags.OnPush) {
 
 這表示在後續的變更偵測執行期間，將會跳過此 component view 及其所有子 view 的檢查。關於 `OnPush` 策略的文件指出，只有在其繫結變更時才會檢查 component。因此，為了執行此操作，必須透過設定 `ChecksEnabled` 位元來啟用檢查。這就是以下程式碼所做的事情（操作 2）：
 
-```
+```typescript
 if (compView.def.flags & ViewFlags.OnPush) {
   compView.state |= ViewState.ChecksEnabled;
 }
@@ -118,7 +118,7 @@ if (compView.def.flags & ViewFlags.OnPush) {
 
 最後，目前 view 的變更偵測負責啟動子 view 的變更偵測（操作 8）。這是檢查子 component view 狀態的地方，如果它是 `ChecksEnabled`，則會對此 view 執行變更偵測。以下是相關的程式碼：
 
-```
+```typescript
 viewState = view.state;
 ...
 case ViewAction.CheckAndUpdate:
@@ -162,7 +162,7 @@ A: AfterViewChecked
 
 假設我們要停用 `AComponent` 及其子 view 的變更偵測。這很容易做到 — 我們只需要將 `ViewState.ChecksEnabled` 設定為 `false`。變更狀態是一種低階操作，因此 Angular 為我們提供了 view 上可用的許多公開方法。每個 component 都可以透過 `ChangeDetectorRef` token 取得其相關 view 的控制權。對於這個類別，Angular 文件定義了以下公開介面：
 
-```
+```typescript
 class ChangeDetectorRef {
   markForCheck() : void
   detach() : void
@@ -179,7 +179,7 @@ class ChangeDetectorRef {
 
 第一個允許我們操作狀態的方法是 `detach`，它只是停用目前 view 的檢查：detach()：
 
-```
+```typescript
 detach(): void { this._view.state &= ~ViewState.ChecksEnabled; }
 ```
 
@@ -238,7 +238,7 @@ export class AComponent {
 
 由於 `reattach` 只是[設定](https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/refs.ts#L242) `ViewState.ChecksEnabled` 位元：
 
-```
+```typescript
 reattach(): void { this._view.state |= ViewState.ChecksEnabled; }
 ```
 
@@ -252,7 +252,7 @@ reattach(): void { this._view.state |= ViewState.ChecksEnabled; }
 
 我們需要一種方法來為所有父 component 啟用檢查，直到根 component。並且[有一個方法](https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/util.ts#L110)為此 `markForCheck`：
 
-```
+```typescript
 let currView: ViewData|null = view;
 while (currView) {
   if (currView.def.flags & ViewFlags.OnPush) {
