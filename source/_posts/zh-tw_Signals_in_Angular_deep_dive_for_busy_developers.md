@@ -6,38 +6,37 @@ tags:
 
 原文：<https://angular.love/signals-in-angular-deep-dive-for-busy-developers>
 
-# Angular 中的 Signals：忙碌開發者的深入探討
+# Angular 中的 Signals：忙碌開發者的深度解析
 
-建構複雜的使用者介面是一項艱鉅的任務。在現代網路應用程式中，UI 狀態很少由簡單的獨立值組成。它更像是依賴於複雜層級的其他值或計算狀態的複雜計算狀態。管理這種狀態需要大量的工作：開發者必須儲存、計算、使失效和同步這些值。
+建構複雜的使用者介面是一項艱鉅的任務。在現代的 web 應用程式中，UI 的 state 很少由簡單的獨立值組成。它更像是一個複雜的 computed state，取決於其他值或 computed state 的複雜層次結構。管理這個 state 涉及大量的工作：開發人員必須儲存、計算、使無效和同步這些值。
 
-多年來，網路開發中引入了各種框架和基本概念，以簡化這項任務。其中大多數的核心主題是響應式程式設計，它提供了管理應用程式狀態的基礎架構，讓開發者可以專注於業務邏輯，而不是重複的狀態管理任務。
+多年來，web 開發中引入了各種框架和基本要素來簡化這項任務。它們大多數的一個核心主題是 reactive programming，它提供了管理應用程式 state 的基礎架構，讓開發人員可以專注於商業邏輯，而不是重複的 state 管理任務。
 
-最近加入的是 **signals**，這是一種「響應式」基本概念，表示動態變化的值，並且可以在值改變時通知感興趣的消費者。這些消費者反過來可以執行重新計算或各種副作用，例如建立/銷毀元件、執行網路請求、更新 DOM 等。
+最新加入的是 signals，一種 "reactive" 的基本要素，它代表一個動態變化值，並可以在值發生變化時通知感興趣的 consumers。這些 consumers 反過來可以運行重新計算或各種 side-effect，例如建立/銷毀 components、運行網路請求、更新 DOM 等。
 
-我們可以在不同的框架中找到 signals 的不同實現。現在甚至有努力[將 signals 標準化](https://github.com/tc39/proposal-signals)：
+我們可以在不同的框架中找到 signals 的不同實現。現在甚至有標準化 signals 的努力：
 
-> _… 這項工作重點是讓 JavaScript 生態系統保持一致。一些框架作者正在這裡合作建立一個通用模型，這個模型可以支援他們的響應式核心。目前的草案是基於來自_ [_Angular_](https://angular.io/)_,_ [_Bubble_](https://bubble.io/)_,_ [_Ember_](https://emberjs.com/)_,_ [_FAST_](https://www.fast.design/)_,_ [_MobX_](https://mobx.js.org/)_,_ [_Preact_](https://preactjs.com/)_,_ [_Qwik_](https://qwik.dev/)_,_ [_RxJS_](https://rxjs.dev/)_,_ [_Solid_](https://www.solidjs.com/)_,_ [_Starbeam_](https://www.starbeamjs.com/)_,_ [_Svelte_](https://svelte.dev/)_,_ [_Vue_](https://vuejs.org/)_,_ [_Wiz_](https://blog.angular.io/angular-and-wiz-are-better-together-91e633d8cd5a)_, 以及更多框架的作者/維護者的設計輸入。_
+... 這項努力的重點是使 JavaScript 生態系統保持一致。一些框架作者正在這裡合作開發一個通用模型，該模型可以支持他們的核心 reactivity。目前的草案基於來自 Angular、Bubble、Ember、FAST、MobX、Preact、Qwik、RxJS、Solid、Starbeam、Svelte、Vue、Wiz 等作者/維護者的設計輸入 ...
 
-Angular 中 signals 的實現非常類似於提案中提供的實現，因此我可能會在本文中對兩者進行交叉引用。
+Angular 中 signals 的實現與提案中提供的實現非常相似，因此我可能會在本文中在這兩者之間進行交叉引用。
 
 <!-- more -->
 
-Signals 作為基本概念
----------------------
+**Signals 作為基本要素**
 
-一個 signal 代表一個可能隨時間改變的資料單元。Signals 可以是「狀態」（只是手動設定的值）或「計算」（可以想像成基於其他 signals 的公式）。
+一個 signal 代表一個資料單元，它可能會隨著時間而改變。Signals 可以是 "state" (只是一個手動設定的值) 或 "computed" (可以想像成基於其他 signals 的公式)。
 
-計算的 signals 的運作方式是自動追蹤它們在評估期間讀取了哪些其他 signals。當讀取一個計算的 signal 時，它會檢查其先前記錄的任何依賴項是否已變更，並在變更時重新評估自身。
+Computed signals 的運作方式是自動追蹤它們在評估期間讀取了哪些其他 signals。當讀取 computed signal 時，它會檢查其先前記錄的任何 dependencies 是否已變更，如果已變更，則會重新評估自身。
 
-例如，這裡我們有一個狀態 signal `counter` 和一個計算的 signal `isEven`。我們將 `counter` 的初始值設定為 `0`，稍後將其變更為 `1`。你可以看到計算的 signal `isEven` 通過在 `counter` signal 更新之前和之後產生兩個不同的值來對變更做出反應：
+例如，這裡我們有一個 state signal `counter` 和一個 computed signal `isEven`。我們將 `counter` 的初始值設定為 0，然後將其更改為 1。你可以看到 computed signal `isEven` 通過在 `counter` signal 更新之前和之後產生兩個不同的值來對變更做出反應：
 
 ```typescript
 import { computed, signal } from '@angular/core';
 
-// 狀態/可寫入的 signal
+// state/writable signal
 const counter = signal(0);
 
-// 計算的 signal
+// computed signal
 const isEven = computed(() => (counter() & 1) == 0);
 
 counter() // 0
@@ -49,48 +48,47 @@ counter() // 1
 isEven() // false
 ```
 
-另請注意，在上面的範例中，`isEven` signal 並未明確訂閱來源 `counter` signal。相反，它只是在其計算函數中使用 `counter()` 來呼叫來源 signal。這足以連結這兩個 signals。因此，每當來源 `counter` signal 更新為新值時，派生的 signal 也會自動更新。
+另請注意，在上面的範例中，`isEven` signal 沒有明確地訂閱來源 `counter` signal。相反，它只是在其 computed function 中使用 `counter()` 呼叫來源 signal。這足以連結兩個 signals。因此，每當 `counter` 來源 signal 更新為新值時，派生的 signal 也會自動更新。
 
-狀態和計算的 signals 都被視為值的生產者。生產者表示產生值並可以傳遞變更通知的 signals。
+State 和 computed signals 都被視為值的 producers。Producers 代表產生值並可以傳遞變更通知的 signals。
 
-當通過 API 呼叫更新值時，狀態 signal 會變更（產生）其值，而當回呼中使用的依賴項變更時，計算的 signal 會自動產生新值。
+當通過 API 呼叫更新值時，state signal 會變更 (產生) 其值，而當 callback 中使用的 dependencies 變更時，computed signal 會自動產生新值。
 
-計算的 signals 也可以是消費者，因為它們可能依賴於一些生產者（消費）。在其他響應式實現中，例如 Rx，消費者也被稱為接收器。
+Computed signals 也可以是 consumers，因為它們可能取決於一些 producers (consume)。在其他 reactive 的實現中，例如 Rx，consumers 也被稱為 sinks。
 
-當生產者 signal 的值變更時，相依的消費者（例如，計算的 signals）的值不會立即更新。當讀取計算的 signal 時，它會檢查其先前記錄的任何依賴項是否已變更，並在必要時重新評估自身。
+當 producer signal 的值變更時，dependent 的 consumers (例如 computed signals) 的值不會立即更新。當讀取 computed signal 時，它會檢查其先前記錄的任何 dependencies 是否已變更，如有必要，則會重新評估自身。
 
-這使得計算的 signals 變成惰性或基於提取的，這表示它們只有在存取時才被評估，即使基礎狀態較早發生變更也是如此。在上面的範例中，計算的 signal 值只有在我們呼叫 `isEven()` 時才被評估，儘管對基礎依賴項 `counter` 的更新較早發生，當我們執行 `counter.set()` 時。
+這使得 computed signals 具有 lazy 或 pull-based 的特性，意味著它們僅在被存取時才會被評估，即使底層的 state 較早發生變更。在我們上面的範例中，computed signal 的值僅在我們呼叫 `isEven()` 時才會被評估，儘管對底層 dependency `counter` 的更新較早發生，即當我們執行 `counter.set()` 時。
 
-除了常規的可寫入和計算的 signals 之外，還有監看者（effects）的概念。與計算的 signals 的基於提取的評估相反，變更生產者 signal 會立即通知監看者，**同步**呼叫監看者的通知回呼，有效地「推送」通知。框架將監看者包裝成暴露給使用者的 effects。Effects 通過排程延遲使用者程式碼的通知。
+除了 regular writable 和 computed signals 之外，還有一個 watchers (effects) 的概念。與 computed signals 的 pull based 評估相反，變更 producer signal 將會立即通知 watcher，同步呼叫 watcher 的通知 callback，有效地 "push" 通知。框架將 watchers 包裝到向使用者公開的 effects 中。Effects 通過排程來延遲使用者程式碼的通知。
 
-與 Promises 不同，signals 中的所有內容都是同步執行的：
+與 Promises 不同，signals 中的所有內容都是同步運行的：
 
-*   將 signal 設定為新值是同步的，並且在之後讀取任何依賴於它的計算的 signal 時，會立即反映出來。沒有內建的批次處理這種變更。
-*   讀取計算的 signals 是同步的 — 它們的值始終可用。
-*   監看者是同步通知的，但是包裝那些監看者的 effects 可以選擇通過排程進行批次處理和延遲通知。
+*   將 signal 設定為新值是同步的，並且在之後讀取任何依賴於它的 computed signal 時會立即反映出來。沒有內建的批次處理此 mutation。
+*   讀取 computed signals 是同步的 - 它們的值始終可用。
+*   Watchers 會同步收到通知，但包裝這些 watchers 的 effects 可以選擇通過排程來批次處理和延遲通知。
 
-實現細節
-----------------------
+**實現細節**
 
-在內部，signals 的實現定義了我在本文中要解釋的一些概念：響應式環境、依賴關係圖和 effects（監看者）。讓我們先從**響應式環境**開始。
+在內部，signals 的實作定義了一些概念，我想在本文中解釋這些概念：reactive context、dependency graph 和 effects (watchers)。讓我們從 reactive context 開始。
 
-要討論響應式環境，可以想像成[堆疊框架](https://stackoverflow.com/questions/79923/what-and-where-are-the-stack-and-heap/80113#80113)（執行框架），它定義了在其中評估和執行 JavaScript 程式碼的環境。特別是，它定義了函數可以使用的物件（變數）。你可以說，這些物件的可用性定義了一個環境。例如，在 Web Worker 環境中執行的函數無權存取 `document` 全域物件。
+要討論 reactive context，可以想像一個堆疊框架 (execution frame)，它定義了 JavaScript 程式碼被評估和執行的環境。具體來說，它定義了哪些 objects (variables) 可供 function 使用。你可以說，這些 objects 的可用性定義了一個 context。例如，在 web worker context 中運行的 function 無法存取 `document` 全域 object。
 
-**響應式環境定義了一個活動的消費者物件**，它依賴於生產者，並且在讀取其值時，可以供其存取器函數使用。例如，這裡我們有一個消費者 `isEvent`，它依賴於 `counter` 生產者（消費其值）。此依賴項是通過在 `computed` 回呼內存取 `counter` 的值來定義的：
+Reactive context 定義了一個 active consumer object，它依賴於 producers，並且在它們的值被讀取時可供其存取 function 使用。例如，這裡我們有一個 consumer `isEvent`，它依賴於 `counter` producer (consume 其值)。該 dependency 是通過存取 computed callback 內部的 `counter` 值來定義的：
 
 ```typescript
 isEvent = computed(() => (counter() & 1) === 0)
 ```
 
-當 `computed` 回呼執行時，它會自動執行 `counter` signal 的存取器函數以取得其值。**我們可以說，在這種情況下，`counter` signal 是在 `isEvent` 消費者的響應式環境中執行的。**因此，如果存在一個活動的消費者依賴於此生產者的值，則生產者將在響應式環境中執行。
+當 computed callback 運行時，它將自動執行 `counter` signal 的 accessor function 來取得其值。我們可以說，在這種情況下，`counter` signal 是在 `isEvent` consumer 的 reactive context 中執行的。因此，如果有一個 active consumer 依賴於此 producer 的值，則 producer 會在 reactive context 中執行。
 
-為了實現響應式環境的這種機制，每次存取消費者的值時，但在重新計算它之前（在執行 `computed` 回呼之前），我們可以將此消費者設定為活動的消費者。這可以通過簡單地將該消費者物件分配給全域變數，並在執行回呼時將其保留在那裡來完成。此全域變數將可供在執行 `computed` 回呼期間查詢的所有生產者使用，並且它將定義此消費者所依賴的所有生產者的響應式環境。
+為了實現 reactive context 的這種機制，每次當存取 consumer 的值時，但在重新計算之前 (在 computed callback 運行之前)，我們可以將此 consumer 設定為 active consumer。這可以通過簡單地將該 consumer object 指派給全域變數並在 callback 執行時將其保留在那裡來完成。這個全域變數將可供在 computed callback 執行期間查詢的所有 producers 使用，並且它將為此 consumer 依賴的所有 producers 定義 reactive context。
 
-這正是 Angular 正在做的事情。當執行計算的回呼時，它將首先將目前節點設定為 [`producerRecomputeValue`](https://github.com/angular/angular/blob/a5b5b7d5ef84b9852d2115dd7a764f4ab3299379/packages/core/primitives/signals/src/computed.ts#L111) 中的活動消費者：
+這正是 Angular 正在做的事情。當 computed callback 執行時，它會先將目前的 node 設定為 `producerRecomputeValue` 中的 active consumer：
 
 ```typescript
 function producerRecomputeValue(node: ComputedNode<unknown>): void {
-  ...
+...
   const prevConsumer = consumerBeforeComputation(node);
   let newValue: unknown;
   try {
@@ -103,7 +101,7 @@ function consumerBeforeComputation(node: ReactiveNode | null) {
 }
 ```
 
-Angular 從 [`createComputed`](https://github.com/angular/angular/blob/a5b5b7d5ef84b9852d2115dd7a764f4ab3299379/packages/core/primitives/signals/src/computed.ts#L53) 工廠函數中的 `producerUpdateValueVersion` 中到達這裡：
+Angular 從 `createComputed` factory function 內部的 `producerUpdateValueVersion` 取得：
 
 ```typescript
 function createComputed<T>(computation: () => T): ComputedGetter<T> {
@@ -121,23 +119,23 @@ function producerUpdateValueVersion(node: ReactiveNode): void {
 }
 ```
 
-此呼叫堆疊也清楚地展示了此實現：
+這個呼叫堆疊也清楚地展示了這種實現：
 
-![圖片 22](https://wp.angular.love/wp-content/uploads/2024/08/1_o_jhWzaf9toobEpVXB37CQ-300x141.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_o_jhWzaf9toobEpVXB37CQ-300x141.webp)
 
-因此，在執行計算的回呼時，在該消費者處於活動狀態期間查詢的每個生產者，都將知道它們是在響應式環境中執行的。**在特定消費者的響應式環境中執行的所有生產者，都會被新增為該消費者的依賴項。**這構成了響應式圖形。
+因此，當 computed 的 callback 正在執行時，在該 consumer 處於 active 狀態期間查詢的每個 producer 都會知道它們是在 reactive context 中執行的。在特定 consumer 的 reactive context 中執行的所有 producers 都會作為 consumer 的 dependencies 添加。這構成了一個 reactive graph。
 
-Angular 中大多數現有的功能都是在非響應式環境中執行的。你可以通過簡單地搜尋使用 `setActiveConsumer` 與 `null` 值的情況來觀察到這一點：
+Angular 中的大多數預先存在的功能都是在非 reactive context 中執行的。你可以通過簡單地搜尋 `setActiveConsumer` 的 null 值用法來觀察到這一點：
 
-![圖片 23](https://wp.angular.love/wp-content/uploads/2024/08/1_AWAf6lmiOOr8VCNtGI3jYg-300x176.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_AWAf6lmiOOr8VCNtGI3jYg-300x176.webp)
 
-例如，在執行生命週期掛鉤之前，Angular 會清除響應式環境：
+例如，在運行 lifecycle hooks 之前，Angular 會清除 reactive context：
 
 ```typescript
 /**
- * 執行單個生命週期掛鉤，確保：
- * - 它是在非響應式環境中呼叫的；
- * - 註冊設定檔資料。
+ * Executes a single lifecycle hook, making sure that:
+ * - it is called in the non-reactive context;
+ * - profiling data are registered.
  */
 function callHookInternal(directive: any, hook: () => void) {
   profiler(ProfilerEvent.LifecycleHookStart, directive, hook);
@@ -151,42 +149,43 @@ function callHookInternal(directive: any, hook: () => void) {
 }
 ```
 
-Angular 樣板函數（元件視圖）和 effects 在響應式環境中執行。
+Angular template functions (component views) 和 effects 在 reactive contexts 中運行。
 
-響應式圖形
---------------
+**Reactive graph**
 
-響應式圖形是通過消費者和生產者之間的依賴關係來建立的。通過值存取器的響應式環境實現，使得 signal 依賴項可以被自動且隱式地追蹤。使用者不需要宣告依賴項陣列，而且特定環境的依賴項集合也不需要在執行之間保持靜態。
+Reactive graph 是通過 consumers 和 producers 之間的 dependencies 來建構的。通過值 accessors 實現的 Reactive context 使 signal dependencies 可以自動且隱含地被追蹤。使用者不需要宣告 dependencies 的陣列，特定 context 的 dependencies 集合也不需要在 execution 之間保持靜態。
 
-當執行生產者時，它會將自身新增到目前活動消費者的依賴項中（定義目前響應式環境的消費者）。這會在 [`producerAccessed`](https://github.com/angular/angular/blob/1081c8d6233ba1ff09187b95a09b0644e130cdf8/packages/core/primitives/signals/src/graph.ts#L238) 函數內發生：
+當執行 producer 時，它會將自身添加到目前 active consumer 的 dependencies 中 (定義目前 reactive context 的 consumer)。這發生在 `producerAccessed` function 內部：
 
 ```typescript
 export function producerAccessed(node: ReactiveNode): void {
   ...
-  // 此生產者是 `activeConsumer` 的第 `idx` 個依賴項。
-    const idx = activeConsumer.nextProducerIndex++;
-    if (activeConsumer.producerNode[idx] !== node) {
-      // 我們是消費者的一個新依賴項（在 `idx` 處）。
-      activeConsumer.producerNode[idx] = node;
-      // 如果活動的消費者是即時的，則將其新增為即時消費者。如果不是，則使用 0 作為佔位符值。
-      activeConsumer.producerIndexOfThis[idx] = consumerIsLive(activeConsumer)
-        ? producerAddLiveConsumer(node, activeConsumer, idx)
-        : 0;
-    }
+  // This producer is the idxth dependency of activeConsumer.
+  const idx = activeConsumer.nextProducerIndex++;
+  if (activeConsumer.producerNode[idx] !== node) {
+    // We're a new dependency of the consumer (at idx).
+    activeConsumer.producerNode[idx] = node;
+    // If the active consumer is live, then add it as a live consumer. If not, then use 0 as a
+    // placeholder value.
+    activeConsumer.producerIndexOfThis[idx] = consumerIsLive(activeConsumer)
+      ? producerAddLiveConsumer(node, activeConsumer, idx)
+      : 0;
+  }
 ```
 
-生產者和消費者都參與響應式圖形。此依賴關係圖是雙向的，但是在每個方向上追蹤的依賴項方面存在差異。
+Producers 和 consumers 都參與 reactive graph。這個 dependency graph 是雙向的，但每個方向追蹤的 dependencies 有所不同。
 
-生產者是通過 `producerNode` 屬性追蹤為消費者的依賴項，從**消費者建立到生產者的**邊：
+Producers 作為 consumer 的 dependencies 通過 `producerNode` property 追蹤，從 consumers 建立到 producers 的邊：
 
 ```typescript
 interface ConsumerNode extends ReactiveNode {
   producerNode: NonNullable<ReactiveNode['producerNode']>;
   producerIndexOfThis: NonNullable<ReactiveNode['producerIndexOfThis']>;
   producerLastReadVersion: NonNullable<ReactiveNode['producerLastReadVersion']>;
+}
 ```
 
-某些消費者也被追蹤為「即時」消費者，並且在另一個方向上建立邊，**從生產者建立到消費者**。這些邊用於在更新生產者的值時傳播變更通知：
+某些 consumers 也被追蹤為 "live" consumers，並在另一個方向上建立邊，從 producer 到 consumer。這些邊用於在更新 producer 的值時傳播變更通知：
 
 ```typescript
 interface ProducerNode extends ReactiveNode {
@@ -195,17 +194,17 @@ interface ProducerNode extends ReactiveNode {
 }
 ```
 
-消費者始終追蹤它們所依賴的生產者。生產者僅追蹤來自被視為「即時」的消費者的依賴項。當消費者將 `consumerIsAlwaysLive` 屬性設定為 `true` 時，或是一個被即時消費者依賴的生產者時，該消費者被視為「即時」。
+Consumers 始終追蹤它們依賴的 producers。Producers 只追蹤來自被視為 "live" 的 consumers 的 dependencies。當 consumer 的 `consumerIsAlwaysLive` property 設定為 true，或者是一個依賴於 live consumer 的 producer 時，consumer 就是 "live" 的。
 
-在 Angular 中，兩種節點類型被定義為即時消費者：
+在 Angular 中，有兩種 node 類型被定義為 live consumers：
 
-*   [watch](https://github.com/angular/angular/blob/a5b5b7d5ef84b9852d2115dd7a764f4ab3299379/packages/core/primitives/signals/src/watch.ts#L137) 節點（用於 effects 中）
-*   響應式 [LView](https://github.com/angular/angular/blob/4c7d5d8acd8a714fe89366f76dc69f91356f0a06/packages/core/src/render3/reactive_lview_consumer.ts#L51) 節點（用於變更偵測中）
+*   watch nodes (用於 effects)
+*   reactive LView nodes (用於 change detection)
 
 這是它們的定義：
 
 ```typescript
-const WATCH_NODE: Partial<WatchNode> = /* @__PURE__ */ (() => {
+const WATCH_NODE: Partial<WatchNode> = /* @PURE */ (() => {
   return {
     ...REACTIVE_NODE,
     consumerIsAlwaysLive: true,
@@ -232,7 +231,7 @@ const REACTIVE_LVIEW_CONSUMER_NODE: Omit<ReactiveLViewConsumer, 'lView'> = {
 };
 ```
 
-在某些情況下，`computed` signals 可能會變成「即時」消費者，例如，當在 `effect` 回呼中使用時。
+在某些情況下，computed signals 可能會成為 "live" consumers，例如，當在 effect callback 中使用時。
 
 以下程式碼設定：
 
@@ -269,13 +268,13 @@ export class AppComponent {
 
     const e = effect(() => b()) as any;
 
-    // 需要等待變更偵測來通知 effect
+    // need to wait for change detection to notify the effect
     setTimeout(() => {
-      // effect 依賴於 B
+      // effect depends on B
       const depEToB = e.watcher[SIGNAL].producerNode[0] === nodes[B];
 
-      // 即時消費者連結從生產者 A 到 B，
-      // 以及從 B 到 E，因為 E (effect) 是即時消費者
+      // live consumers link from producer A to B,
+      // and from B to E, because E (effect) is a live consumer
       const depLiveAToB = nodes[A].liveConsumerNode[0] === nodes[B];
       const depLiveBToE = nodes[B].liveConsumerNode[0] === e.watcher[SIGNAL];
 
@@ -285,34 +284,35 @@ export class AppComponent {
 }
 ```
 
-將產生以下圖形：
+將產生以下 graph：
 
-![圖片 24](https://wp.angular.love/wp-content/uploads/2024/08/1_vDJV8hF-twTuf1GckjPnZQ-300x123.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_vDJV8hF-twTuf1GckjPnZQ-300x123.webp)
 
-通過活動消費者實現的響應式環境能夠實現**動態依賴項追蹤**。當將某個消費者設定為活動狀態時，被評估的生產者會通過這些生產者呼叫的順序來動態定義。每次在消費者的響應式環境中存取生產者時，都可以為 `ActiveConsumer` 重新排列依賴項清單。
+通過 active consumer 實現的 reactive context 可以實現動態 dependency 追蹤。當將特定 consumer 設定為 active 時，被評估的 producers 是通過這些 producers 呼叫的順序動態定義的。每次在該 consumer 的 reactive context 中存取 producer 時，都可以為 ActiveConsumer 重新排列 dependency 列表。
 
-為了實現這一點，消費者的依賴項會追蹤在 `producerNode` 陣列中：
+為了實現這一點，consumer 的 dependencies 會在 `producerNode` 陣列中追蹤：
 
 ```typescript
 interface ConsumerNode extends ReactiveNode {
   producerNode: NonNullable<ReactiveNode['producerNode']>;
   producerIndexOfThis: NonNullable<ReactiveNode['producerIndexOfThis']>;
   producerLastReadVersion: NonNullable<ReactiveNode['producerLastReadVersion']>;
+}
 ```
 
-當重新執行特定消費者的計算時，該陣列中的指標（索引）`producerIndexOfThis` 會初始化為索引 `0`，並且每個讀取的依賴項都會與先前執行中指標目前位置的依賴項進行比較。如果存在不匹配，則表示自上次執行以來，依賴項已變更，並且可以刪除舊的依賴項並替換為新的依賴項。在執行結束時，可以刪除任何剩餘的不匹配依賴項。
+當特定 consumer 的計算重新運行時，一個指標 (index) `producerIndexOfThis` 將初始化為 index 0，並且每個讀取的 dependency 都會與上一次運行時指標目前位置的 dependency 進行比較。如果存在不匹配，則表示 dependencies 自上次運行以來已變更，並且可以刪除舊的 dependency 並替換為新的 dependency。在運行結束時，可以刪除任何剩餘的不匹配 dependencies。
 
-這表示，如果你只有一個分支需要依賴項，並且先前的計算採用了另一個分支，那麼即使在提取時，對該臨時未使用的值進行變更也不會導致重新計算計算的 signal。這導致了在一次執行到下一次執行時存取的不同 signals 集合的可能性。
+這表示，如果你只有一個分支需要 dependency，並且先前的計算採用了另一個分支，那麼即使在 pull 時，對該暫時未使用的值進行變更也不會導致重新計算 computed signal。這導致可能從一個 execution 到下一個 execution 存取不同的 signal 集合。
 
-例如，此計算的 signal `dynamic` 會根據 `useA` signal 的值讀取 `dataA` 或 `dataB`：
+例如，此 computed signal 會根據 `useA` signal 的值動態讀取 `dataA` 或 `dataB`：
 
 ```typescript
 const dynamic = computed(() => useA() ? dataA() : dataB());
 ```
 
-在任何給定的時間點，它將具有 `[useA, dataA]` 或 `[useA, dataB]` 的依賴項集合，並且它永遠不能同時依賴於 `dataA` 和 `dataB`。
+在任何給定的時間點，它都將具有 `[useA, dataA]` 或 `[useA, dataB]` 的 dependency 集合，並且永遠不能同時依賴於 `dataA` 和 `dataB`。
 
-此程式碼類似於 Angular 中的[此測試案例](https://github.com/proposal-signals/signal-polyfill/blob/4cf87cef28aa89e938f079e4d82e9bf10f6d0a4c/tests/behaviors/dynamic-dependencies.test.ts#L4)，清楚地展示了這一點：
+此程式碼類似於 Angular 中的此測試案例，清楚地表明了這一點：
 
 ```typescript
 import { computed, signal } from '@angular/core';
@@ -350,22 +350,21 @@ function expectEqualArrayElements(v1, v2): any {
 }
 ```
 
-如你所見，圖形沒有單個起始頂點。由於每個消費者都保留一個依賴生產者的清單，而這些生產者又可能具有依賴項，例如計算的 signal，因此你可以說，每個消費者在被存取時都是圖形的根頂點。
+如你所見，graph 沒有一個單一的起始頂點。由於每個 consumer 都保留了 dependency producers 的列表，而這些 producers 又可能具有 dependencies，例如 computed signal，因此你可以說，每個 consumer 在被存取時都是 graph 的根頂點。
 
-兩階段更新
------------------
+**兩階段更新**
 
-早期基於推送的響應式模型面臨著冗餘計算的問題：如果對狀態 signal 的更新導致計算的 signal 急切地執行，則最終可能會將更新推送至 UI。但是，如果在下一個框架之前，源狀態 signal 將再次發生變更，則此寫入 UI 的操作可能為時過早。
+早期的 push-based reactivity 模型面臨著冗餘計算的問題：如果對 state signal 的更新導致 computed signal 急切運行，最終可能會將更新 push 到 UI。但是，如果下一個 frame 之前還有另一個對原始 state signal 的變更，則對 UI 的寫入可能會過早。
 
-例如，對於這樣的圖形，此問題涉及無意中評估 `A -> B -> D` 和 `C`，然後由於 `C` 已變更而重新評估 `D`。重新評估 `D` 兩次是低效的，並且可能導致使用者明顯地看到故障。
+例如，對於像這樣的 graph，這個問題涉及無意中評估 `A -> B -> D` 和 `C`，然後由於 `C` 已變更而重新評估 `D`。重新評估 `D` 兩次是低效的，並且可能會導致使用者明顯的 glitches。
 
-![圖片 25](https://wp.angular.love/wp-content/uploads/2024/08/0_IgUGB8HjKNyQRqhV.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/0_IgUGB8HjKNyQRqhV.webp)
 
-這被稱為菱形問題。
+這被稱為鑽石問題。
 
-有時，由於這種[故障](https://en.wikipedia.org/wiki/Reactive_programming#Glitches)，甚至會向最終使用者顯示不準確的中間值。Signals 通過基於提取（惰性）而不是基於推送的方式來避免這種動態行為：當框架排程 UI 呈現時，它將提取適當的更新，從而避免在計算以及寫入 DOM 中浪費工作。
+有時，由於這種 glitches，甚至會向終端使用者顯示不準確的中間值。Signals 通過 pull-based (lazy) 而不是 push-based 來避免這種動態：在框架排程 UI 渲染時，它會 pull 適當的更新，避免在計算和寫入 DOM 中浪費工作。
 
-考慮以下範例：
+考慮這個範例：
 
 ```typescript
 const a = signal(0);
@@ -374,14 +373,14 @@ const b = computed(() => a() + 'b');
 const c = computed(() => a() + 'c');
 const d = computed(() => b() + c() + 'd');
 
-// 執行計算的回呼以設定依賴項
+// run the computed callback to set up dependencies
 d();
 
-// 更新圖形頂部的 signal
+// update the signal at the top of the graph
 setTimeout(() => a.set(1), 2000);
 ```
 
-一旦 `a` 更新，就不會發生傳播。僅更新節點的值和版本：
+一旦更新 `a`，就不會發生傳播。僅更新 node 的值和版本：
 
 ```typescript
 function signalSetFn(node, newValue) {
@@ -398,36 +397,39 @@ function signalValueChanged(node) {
 }
 ```
 
-當我們稍後存取 `d()` 的值時，signals 實現會向上輪詢 `d` 的依賴項，通過 `consumerPollProducersForChange` 來確定是否需要重新計算。
+當我們稍後存取 `d()` 的值時，signals 的實作會向上 poll `d` 的 dependencies，通過 `consumerPollProducersForChange` 來確定是否需要重新計算。
 
-為了有效地處理，所有響應式節點都會記錄依賴項節點的版本。要確定變更，只需簡單地比較生產者節點的已儲存版本與節點上的實際版本：
+為了實現有效率的處理，所有 reactive nodes 都會記錄 dependency node 的版本。為了確定變更，只需將 producer node 的已儲存版本與 node 上的實際版本進行比較就足夠了：
 
 ```typescript
 interface ConsumerNode extends ReactiveNode {
-...
-producerLastReadVersion: NonNullable<ReactiveNode['producerLastReadVersion']>;
+  ...
+  producerLastReadVersion: NonNullable<ReactiveNode['producerLastReadVersion']>;
 }
 
 function consumerPollProducersForChange(node) {
-...
-// 輪詢生產者以了解變更。
-for (let i = 0; i < node.producerNode.length; i++) {
-const producer = node.producerNode[i];
-const seenVersion = node.producerLastReadVersion[i];
-// 首先檢查版本。不匹配表示自上次讀取以來，生產者的值已知已變更。
-if (seenVersion !== producer.version) {
-return true;
+  ...
+  // Poll producers for change.
+  for (let i = 0; i < node.producerNode.length; i++) {
+    const producer = node.producerNode[i];
+    const seenVersion = node.producerLastReadVersion[i];
+    // First check the versions. A mismatch means that the producer's value is known to have
+    // changed since the last time we read it.
+    if (seenVersion !== producer.version) {
+      return true;
+    }
 }
 ```
 
-如果這些版本不同，則表示生產者已發生變更，並且實現將通過 `producerRecomputeValue` 執行計算回呼的重新計算：
+如果這些不同，則表示 producer 已變更，並且實作將通過 `producerRecomputeValue` 運行 computed callback 的重新計算：
 
 ```typescript
 export function producerUpdateValueVersion(node: ReactiveNode): void {
   ...
 
   if (!node.producerMustRecompute(node) && !consumerPollProducersForChange(node)) {
-    // 自上次讀取以來，我們沒有任何生產者報告變更，因此無需重新計算我們的值，並且我們可以認為自己是乾淨的。
+    // None of our producers report a change since the last time they were read, so no
+    // recomputation of our value is necessary, and we can consider ourselves clean.
     node.dirty = false;
     node.lastCleanEpoch = epoch;
     return;
@@ -435,23 +437,23 @@ export function producerUpdateValueVersion(node: ReactiveNode): void {
 
   node.producerRecomputeValue(node);
 
-  // 重新計算值後，我們不再是髒的。
+  // After recomputing the value, we're no longer dirty.
   node.dirty = false;
   node.lastCleanEpoch = epoch;
 }
 ```
 
-這將對 `C` 的依賴項重複該過程。通過這種方式，它將到達節點 `A`，此時將導致評估分支 `D->C->A`。但是由於 `D` 也依賴於 `B` 生產者，因此它將在計算 `D` 之前重新評估 `B`。通過這種方式，不會出現 `D` 的雙重計算問題。
+這將對 `C` 的 dependencies 重複此過程。這樣，它將到達 node `A`，此時將導致評估分支 `D->C->A`。但是由於 `D` 也依賴於 `B` producer，因此它會在計算 `D` 之前重新評估該 producer。這樣，`D` 就沒有重複計算的問題。
 
-但是，有時你可能需要急切地通知某些消費者。正如你可能已經猜到的，這些被稱為「即時」消費者。在這種情況下，只要更新生產者的值，變更通知就會通過圖形傳播，通知依賴於生產者的即時消費者。
+但是，有時你可能需要急切地通知某些 consumers。你可能已經猜到了，這些被稱為 "live" consumers。在這種情況下，一旦更新 producer value，變更通知就會通過 graph 傳播，通知依賴於 producer 的 live consumers。
 
-其中一些消費者可能是衍生值，因此也是生產者，這會使其快取值失效，然後繼續將變更通知傳播到自己的即時消費者，依此類推。最終，此通知會到達 effects，這些 effects 會排程自身以重新執行。
+其中一些 consumers 可能是派生值，因此也是 producers，它們會使快取的值無效，然後繼續將變更通知傳播到它們自己的 live consumers，依此類推。最終，此通知到達 effects，這些 effects 會排程自身以重新執行。
 
-**至關重要的是，在此階段，不會執行任何副作用，也不會執行任何中間或衍生值的重新計算，僅執行快取值的失效。這允許變更通知到達圖形中的所有受影響節點，而不會出現觀察到中間或錯誤狀態的可能性。**
+至關重要的是，在此階段，不會運行任何 side effects，並且不會執行中間值或派生值的重新計算，只會使快取值無效。這允許變更通知到達 graph 中的所有受影響 nodes，而不會出現觀察到中間或 glitches 的 states 的可能性。
 
-如果需要，一旦此變更傳播完成（同步），此階段可以接著我們上面看到的惰性評估。
+如果需要，一旦此變更傳播完成 (同步)，此階段之後可以是我們上面看到的 lazy 評估。
 
-要查看此通知階段的實際運作情況，讓我們在我們的設定中新增一個即時消費者，例如監看者。當更新 `a` 時，更新會傳播到相依的即時消費者：
+要查看此通知階段的運行情況，讓我們在我們的設定中新增一個 live consumer，例如一個 watcher。當 `a` 更新時，更新將會傳播到 dependent 的 live consumers：
 
 ```typescript
 import { computed, signal } from '@angular/core';
@@ -464,7 +466,7 @@ const d = computed(() => b() + c() + 'd');
 
 setTimeout(() => a.set(1), 3000);
 
-// 監看者將設定對 `d` 的依賴項
+// watcher will setup a dependency on d
 const watcher = createWatch(
   () => console.log(d()),
   () => setTimeout(watcher.run, 1000),
@@ -474,13 +476,13 @@ const watcher = createWatch(
 watcher.notify();
 ```
 
-一旦我們更新 `a.set(1)` 的值，我們就可以看到即時消費者正在運作中的通知：
+一旦我們更新 `a.set(1)` 的值，我們就可以看到 live consumers 的通知正在執行：
 
-![圖片 26](https://wp.angular.love/wp-content/uploads/2024/08/1_39Jgsu7ROYU5MEoWGnMF8w-300x181.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_39Jgsu7ROYU5MEoWGnMF8w-300x181.webp)
 
-節點 `b` 和 `c` 是節點 `a` 的即時消費者，因此當執行 `a` 的更新時，Angular 將遍歷 `node.liveConsumerNode` 並通知這些節點有關變更。
+Nodes `b` 和 `c` 是 node `a` 的 live consumers，因此當為 `a` 運行更新時，Angular 將會遍歷 `node.liveConsumerNode` 並通知這些 nodes 變更。
 
-但是，正如前面提到的，這裡沒有真正發生任何事情。該節點只是被標記為髒的，並通過 `producerNotifyConsumers` 將通知傳播到其即時消費者：
+但是，如前所述，這裡沒有真正發生任何事情。該 node 只是被標記為 dirty，並通過 `producerNotifyConsumers` 將通知傳播到其 live consumers：
 
 ```typescript
 function consumerMarkDirty(node) {
@@ -490,7 +492,7 @@ function consumerMarkDirty(node) {
 }
 ```
 
-所有這些都會一路傳遞到依賴於 `d` 的監看者 (effect)。與常規響應式節點相反，監看節點在其 `consumerMarkedDirty` 方法中實現排程：
+所有這些都會一直追溯到依賴於 `d` 的 watcher (effect)。與 regular reactive nodes 相反，watch node 在其 `consumerMarkedDirty` method 中實現了排程：
 
 ```typescript
 const WATCH_NODE: Partial<WatchNode> = (() => {
@@ -509,18 +511,17 @@ const WATCH_NODE: Partial<WatchNode> = (() => {
 })();
 ```
 
-在這裡，通知階段和圖形遍歷會停止。
+在這裡，通知階段和 graph 遍歷停止。
 
-這個兩階段的過程有時被稱為「推送/提取」演算法：「骯髒」會在變更來源 signal 時通過圖形急切推送，但是重新計算是惰性執行的，僅當通過讀取它們的 signals 來提取值時才執行。
+這個兩階段過程有時被稱為 "push/pull" 演算法：當變更來源 signal 時，"dirtiness" 會被急切地 push 到 graph 中，但重新計算是 lazy 地執行的，僅當通過讀取其 signals 來 pull 值時才會執行。
 
-變更偵測
-----------------
+**Change detection**
 
-為了將基於 signals 的通知整合到變更偵測過程中，Angular 依賴於即時消費者的機制。元件樣板會編譯為樣板表達式（JS 程式碼），並在該元件視圖的響應式環境中執行。在這種情況下，執行 signal 將傳回該值，但也將 signal 註冊為該元件視圖的依賴項。
+為了將基於 signals 的通知整合到 change detection 過程中，Angular 依賴於 live consumers 的機制。Component templates 被編譯為 template expressions (JS 程式碼)，並在該 component 視圖的 reactive context 中執行。在這種 contexts 中，執行 signal 將會返回 value，但也會將 signal 註冊為 component 視圖的 dependency。
 
-**由於樣板表達式是即時消費者，因此 Angular 將建立從生產者到樣板表達式節點的連結。只要生產者的值更新，該生產者就會立即同步通知樣板節點。收到通知後，Angular 會標記元件及其所有祖先以進行檢查。**
+由於 template expressions 是 live consumers，因此 Angular 會建立從 producer 到 template expression node 的連結。一旦更新 producer 的值，該 producer 將會立即且同步地通知 template node。收到通知後，Angular 將會標記 component 及其所有 ancestors 以進行檢查。
 
-你可能已經[從我的其他文章](https://angular.love/change-detection-and-component-trees-in-angular-applications)中了解到，每個元件的樣板在內部都表示為 `LView` 物件。以下是元件的外觀：
+正如你可能從我的其他文章中了解到的那樣，每個 component 的 template 在內部都表示為 `LView` object。以下是 component 的外觀：
 
 ```typescript
 @Component({...})
@@ -529,7 +530,7 @@ export class AppComponent {
 }
 ```
 
-編譯時，它看起來像常規的 JS 函數 `AppComponent_Template`，在該元件的變更偵測期間執行：
+編譯後，它看起來像常規的 JS function `AppComponent_Template`，該 function 在此 component 的 change detection 期間執行：
 
 ```typescript
 this.ɵcmp = defineComponent({
@@ -546,7 +547,7 @@ this.ɵcmp = defineComponent({
 });
 ```
 
-當 Angular 將 signals 新增到其變更偵測實現時，它將所有元件視圖（樣板函數）包裝在 `ReactiveLViewConsumer` 節點中：
+當 Angular 將 signals 新增到其 change detection 實作中時，它將所有 component views (template function) 包裝在 `ReactiveLViewConsumer` node 中：
 
 ```typescript
 export interface ReactiveLViewConsumer extends ReactiveNode {
@@ -554,7 +555,7 @@ export interface ReactiveLViewConsumer extends ReactiveNode {
 }
 ```
 
-此介面由 [`REACTIVE_LVIEW_CONSUMER_NODE`](https://github.com/angular/angular/blob/4c7d5d8acd8a714fe89366f76dc69f91356f0a06/packages/core/src/render3/reactive_lview_consumer.ts#L51) 節點實現：
+該介面由 `REACTIVE_LVIEW_CONSUMER_NODE` node 實現：
 
 ```typescript
 const REACTIVE_LVIEW_CONSUMER_NODE: Omit<ReactiveLViewConsumer, 'lView'> = {
@@ -569,23 +570,23 @@ const REACTIVE_LVIEW_CONSUMER_NODE: Omit<ReactiveLViewConsumer, 'lView'> = {
 };
 ```
 
-你可以將此過程想像成每個視圖都獲得自己的 `ReactiveLViewConsumer` **消費者**節點，該節點定義了在樣板函數內存取的所有 signals 的響應式環境。
+你可以將此過程視為每個視圖取得自己的 `ReactiveLViewConsumer` consumer node，該 node 定義在 template function 內部存取的所有 signals 的 reactive context。
 
-在我們的範例中，每當樣板函數作為變更偵測的一部分執行時，它都會在樣板函數節點的環境中執行 `ctx.value()` 生產者，而該節點是一個 `ActiveConsumer`：
+在我們的範例中，每當 template function 作為 change detection 的一部分運行時，它會在 template function node 的 context 中執行 `ctx.value()` producer，該 node 作為 `ActiveConsumer`：
 
-![圖片 27](https://wp.angular.love/wp-content/uploads/2024/08/1_qeeISKeap4-Oo6WlikyPZQ-300x204.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_qeeISKeap4-Oo6WlikyPZQ-300x204.webp)
 
-這將導致將樣板表達式節點（消費者）作為**即時**依賴項新增至生產者 `value()`：
+這將導致 template expression node (consumer) 作為 live dependency 添加到 producer `value()`：
 
-![圖片 28](https://wp.angular.love/wp-content/uploads/2024/08/1_O9Cqy1y_Q8rnwxpu84BieA-300x173.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_O9Cqy1y_Q8rnwxpu84BieA-300x173.webp)
 
-此依賴項確保一旦生產者 `counter` 的值變更，它將立即通知消費者節點（樣板表達式）。
+此 dependency 可確保一旦 producer `counter` 的值發生變更，它將立即通知 consumer node (template expression)。
 
-當生產者的值變更時，即時消費者會同步呼叫 `consumerMarkDirty` 方法：
+Live consumers 實現了 `consumerMarkDirty` method，該 method 在 producer 的值變更時由 producer 同步呼叫：
 
 ```typescript
 /**
- * 將骯髒的通知傳播到此生產者的即時消費者。
+ * Propagate a dirty notification to live consumers of this producer.
  */
 function producerNotifyConsumers(node: ReactiveNode): void {
   ...
@@ -607,7 +608,7 @@ function consumerMarkDirty(node: ReactiveNode): void {
 }
 ```
 
-在 `consumerMarkedDirty` 內部，樣板表達式節點將使用 `markAncestorsForTraversal` 來標記要刷新的祖先，其方式與之前 `markForCheck()` 的方式類似：
+在 `consumerMarkedDirty` 內部，template expression node 將使用 `markAncestorsForTraversal` 以類似於之前 `markForCheck()` 的方式標記 ancestors 以進行重新整理：
 
 ```typescript
 const REACTIVE_LVIEW_CONSUMER_NODE: Omit<ReactiveLViewConsumer, 'lView'> = {
@@ -627,9 +628,9 @@ function markAncestorsForTraversal(lView: LView) {
 }
 ```
 
-最後一個問題是 Angular 何時將目前的 `LView` 消費者節點設定為 `ActiveConsumer`？這一切都發生在你可能已經從我之前的文章中了解到的 [`refreshView`](https://github.com/angular/angular/blob/4c7d5d8acd8a714fe89366f76dc69f91356f0a06/packages/core/src/render3/instructions/change_detection.ts#L192) 函數中。
+最後一個問題是 Angular 何時將目前的 `LView` consumer node 設定為 `ActiveConsumer`？所有這些都發生在 `refreshView` function 內部，你可能已經從我之前的文章中了解了這個 function。
 
-此函數對每個 `LView` 執行變更偵測，並執行常見的變更偵測操作：執行樣板函數、執行掛鉤、刷新查詢和設定主機綁定。基本上，在 Angular 執行所有這些操作之前，已經新增了整段程式碼來處理響應性。
+此 function 對每個 `LView` 運行 change detection，並運行常見的 change detection 操作：執行 template function、執行 hooks、重新整理 queries 和設定 host bindings。基本上，在 Angular 運行所有這些操作之前，已新增了一整段處理 reactivity 的程式碼。
 
 以下是它的外觀：
 
@@ -637,7 +638,7 @@ function markAncestorsForTraversal(lView: LView) {
 function refreshView<T>(tView, lView, templateFn, context) {
   ...
 
-  // 啟動元件響應式環境
+  // Start component reactive context
   enterView(lView);
   let returnConsumerToPool = true;
   let prevConsumer: ReactiveNode | null = null;
@@ -648,37 +649,35 @@ function refreshView<T>(tView, lView, templateFn, context) {
       prevConsumer = consumerBeforeComputation(currentConsumer);
     } else {... }
 
-    ...
+  ...
 
-    try {
-      ...
-      if (templateFn !== null) {
-        executeTemplate(tView, lView, templateFn, RenderFlags.Update, context);
-      }
-  }
+  try {
+    ...
+    if (templateFn !== null) {
+      executeTemplate(tView, lView, templateFn, RenderFlags.Update, context);
+    }
 ```
 
-由於此程式碼是在 Angular 在 `executeTemplate` 程式碼中執行元件的樣板函數之前執行的，因此，當執行元件樣板中使用的 signals 的存取器函數時，已經設定了響應式環境。
+由於此程式碼是在 Angular 在 `executeTemplate` 程式碼中運行 component 的 template function 之前執行的，因此當 component template 中使用的 signals 的 accessor functions 執行時，已經設定了 reactive context。
 
-Effects 和監看者
---------------------
+**Effects 和 watchers**
 
-Effect 是一種專門的工具，旨在根據應用程式的狀態執行具有副作用的操作。Effects 是使用在響應式環境中執行的回呼定義的即時消費者。會擷取此函數的 signal 依賴項，並且每當其任何依賴項產生新值時，都會通知 effect。
+Effect 是一種專門的工具，旨在基於應用程式的 state 執行具有 side-effect 的操作。Effects 是使用在 reactive context 中執行的 callback 定義的 live consumers。捕獲此 function 的 signal dependencies，並且每當其任何 dependencies 產生新值時都會通知 effect。
 
-在大多數應用程式程式碼中很少需要 effects，但在特定情況下可能會很有用。以下是 Angular 文件中建議的一些使用範例：
+Effects 在大多數應用程式程式碼中很少需要，但在特定情況下可能有用。以下是 Angular 文件中建議的一些使用範例：
 
-*   記錄資料或使其與 `window.localStorage` 同步
-*   新增無法使用樣板語法表達的自訂 DOM 行為，例如對 `<canvas>` 元素執行自訂呈現
+*   記錄資料或使其與 window.localStorage 保持同步
+*   新增無法使用 template 語法表達的自訂 DOM 行為，例如執行對 `<canvas>` 元素的自訂渲染
 
-**Angular 不會在變更偵測機制中使用 effects 來觸發元件的 UI 更新。如變更偵測部分所述，對於此功能，它依賴於即時消費者的機制。**
+Angular 不使用 effects 在 change detection 機制中觸發 component 的 UI 更新。如 change detection 章節中所述，此功能依賴於 live consumers 的機制。
 
-雖然 signal 演算法是標準化的，但尚未定義 effects 應如何運作的詳細資訊，並且在不同的框架之間會有所不同。這是因為 effect 排程的細微性質，它通常會與框架呈現週期和其他高階、框架特定的狀態或 JavaScript 無法存取的策略整合。
+雖然 signal 演算法是標準化的，但 effects 應如何運作的細節尚未定義，並且在不同的框架中會有所不同。這是由於 effect 排程的微妙性質，它通常與框架渲染週期和其他高層次的、框架特定的 states 或 JavaScript 無法存取的策略整合在一起。
 
-但是，signal 提案定義了一組基本概念，即 [watch](https://github.com/angular/angular/blob/main/packages/core/primitives/signals/README.md#side-effects-createwatch) API，框架作者可以使用這些基本概念來建立自己的 effects。`Watcher` 介面用於監看響應式函數，並在該函數的依賴項變更時接收通知。
+但是，signals 提案定義了一組基本要素，即 watch API，框架作者可以使用它們來建立自己的 effects。Watcher 介面用於觀察 reactive function，並在該 function 的 dependencies 變更時接收通知。
 
-在 Angular 中，`effect` 是 `watcher` 的包裝器。首先，讓我們探索監看者如何運作，我們將看到它們如何用於建構 `effect` 基本概念。
+在 Angular 中，effect 是 watcher 的包裝器。首先讓我們探索 watchers 的運作方式，我們將了解它們如何用於建立 effect 基本要素。
 
-首先，我們將從 Angular 基本概念中匯入 `watcher`，並使用它來實現通知機制：
+首先，我們將從 Angular 基本要素匯入 watcher，並使用它來實現通知機制：
 
 ```typescript
 import { createWatch } from '@angular/core/primitives/signals';
@@ -686,36 +685,36 @@ import { createWatch } from '@angular/core/primitives/signals';
 const counter = signal(0);
 
 const watcher = createWatch(
-  // 執行使用者提供的回呼並設定追蹤
-  // 這將執行 2 次
-  // 第一次在 `watcher.notify()` 之後，第二次在 `this.counter.set(1)` 之後
+  // run the user provided callback and set up tracking
+  // this will be executed 2 times
+  // 1st after watcher.notify() and 2nd time after this.counter.set(1)
   () => counter(),
-  // 這由 `notify` 方法呼叫
-  // 或由消費者本身通過 consumerMarkDirty 方法呼叫，
-  // 會排程使用者提供的回呼在 1000 毫秒後執行
+  // this is called by the notify method
+  // or by the consumer itself through through consumerMarkDirty method,
+  // schedules the user provided callback to run in 1000ms
   () => setTimeout(watcher.run, 1000),
   false
 );
 
-// 將監看者標記為骯髒的 (過時的)，以強制使用者提供的回呼
-// 執行並設定 `counter` signal 的追蹤
-// `notify` 方法會在底層呼叫 `consumerMarkDirty`
+// mark the watcher as dirty (stale) to force the user provided callback
+// to run and set up tracking for the counter signal
+// notify method will call consumerMarkDirty under the hood
 watcher.notify();
 
-// 當值變更時，會執行 consumerMarkDirty
-// 它會排程使用者提供的回呼執行
+// when the value changes, consumerMarkDirty is executed
+// which schedules the user provided callback to run
 setTimeout(() => this.counter.set(1), 3000);
 ```
 
-當我們執行 `watcher.notify()` 時，Angular 會在監看者節點上同步呼叫 `consumerMarkDirty` 方法。但是，使用者定義的通知回呼不會在收到通知後立即執行。相反，它被排程在未來某個時間通過 `watcher.run` 執行。當 `watch` 接收到「markDirty」通知時，它將僅呼叫此排程操作。
+當我們運行 `watcher.notify()` 時，Angular 會同步呼叫 watcher node 上的 `consumerMarkDirty` method。但是，使用者定義的通知 callback 不會在通知後立即執行。相反，它被排程為在未來通過 `watcher.run` 運行。當 watch 收到 "markDirty" 通知時，它將簡單地呼叫此排程操作。
 
-你可以在實際運作中看到：
+您可以在這裡看到實際操作：
 
-![圖片 29](https://wp.angular.love/wp-content/uploads/2024/08/1_FwpksG4QvcTYICQ6mHRChg-300x96.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_FwpksG4QvcTYICQ6mHRChg-300x96.webp)
 
-當我們執行 `this.counter.set(1)` 時，相同的呼叫鏈會導致排程使用者提供的回呼。
+當我們運行 `this.counter.set(1)` 時，相同的呼叫鏈會導致排程使用者提供的 callback 運行。
 
-為了建構 `effect()` 函數，Angular 將監看者包裝在 `EffectHandle` 類別中：
+為了建立 `effect()` function，Angular 將 watcher 包裝在 `EffectHandle` class 中：
 
 ```typescript
 export function effect(effectFn,options): EffectRef {
@@ -738,7 +737,7 @@ class EffectHandle implements EffectRef, SchedulableEffect {
   }
 ```
 
-你可以看到 `EffectHandle` 類別是設定監看者的地方。對於我們之前使用監看者的上述範例，使用 `effect` 函數將大大簡化設定：
+你可以看到，`EffectHandle` class 是設定 watcher 的地方。對於我們之前使用 watchers 的範例，使用 `effect` function 將會大大簡化設定：
 
 ```typescript
 import { Component, effect, signal } from '@angular/core';
@@ -750,7 +749,7 @@ export class AppComponent {
   constructor() {
     this.counter = signal(0);
 
-    // 這將執行 2 次
+    // this will be executed 2 times
     effect(() => this.counter());
 
     setTimeout(() => this.counter.set(1), 3000);
@@ -758,9 +757,9 @@ export class AppComponent {
 }
 ```
 
-當我們直接使用 `effect` 函數時，我們只傳遞一個回呼。這是使用者定義的回呼，它設定依賴項，並且在更新依賴項時由 Angular 排程執行。
+當我們直接使用 `effect` function 時，我們只會傳遞一個 callback。這是使用者定義的 callback，它會設定 dependencies，並在 dependencies 更新時由 Angular 排程運行。
 
-Angular effects 中使用的目前排程器是 `ZoneAwareEffectScheduler`，它在變更偵測週期之後作為微任務佇列的一部分執行更新：
+Angular effects 中使用的目前 scheduler 是 `ZoneAwareEffectScheduler`，它會在 change detection 週期後作為 microtask 佇列的一部分運行更新：
 
 ```typescript
 export class ZoneAwareEffectScheduler implements EffectScheduler {
@@ -770,23 +769,23 @@ export class ZoneAwareEffectScheduler implements EffectScheduler {
   private taskId: number | null = null;
 
   scheduleEffect(handle: SchedulableEffect): void {
-      this.enqueue(handle);
-      if (this.taskId === null) {
-        const taskId = (this.taskId = this.pendingTasks.add());
-        queueMicrotask(() => {
-          this.flush();
-          this.pendingTasks.remove(taskId);
-          this.taskId = null;
-        });
-      }
+    this.enqueue(handle);
+    if (this.taskId === null) {
+      const taskId = (this.taskId = this.pendingTasks.add());
+      queueMicrotask(() => {
+        this.flush();
+        this.pendingTasks.remove(taskId);
+        this.taskId = null;
+      });
     }
+  }
 ```
 
-Angular 必須實現一個有趣的特性來「初始化」effect。正如我們在監看者的實現中所看到的，我們需要通過手動呼叫 `watcher.notify()` 一次來啟動追蹤。Angular 也需要這樣做，並且在第一次執行變更偵測時這樣做。
+Angular 必須實現一個有趣的怪癖才能 "初始化" effect。正如我們在 watcher 的實作中看到的那樣，我們需要手動呼叫 `watcher.notify()` 一次來啟動追蹤。Angular 也需要這樣做，並且會在第一次運行 change detection 時這樣做。
 
 以下是它的實現方式。
 
-當你在元件的注入環境中執行 `effect` 函數時，Angular 會將通知回呼新增至元件的視圖物件 `LView[EFFECTS_TO_SCHEDULE]`：
+當你在 component 的 injection context 內部執行 `effect` function 時，Angular 會將通知 callback 新增到 component 的 view object `LView[EFFECTS_TO_SCHEDULE]`：
 
 ```typescript
 export function effect(
@@ -796,14 +795,18 @@ export function effect(
   ...
   const handle = new EffectHandle();
 
-  // 需要手動將 effects 標記為骯髒的，以觸發它們的初始執行。此標記的時機很重要，因為 effects 可能會讀取追蹤元件輸入的 signals，這些 signals 僅在這些元件進行首次更新傳遞後才可用。
+  // Effects need to be marked dirty manually to trigger their initial run. The timing of this
+  // marking matters, because the effects may read signals that track component inputs, which are
+  // only available after those components have had their first update pass.
   // ...
   const cdr = injector.get(ChangeDetectorRef, null, {optional: true}) as ViewRef<unknown> | null;
   if (!cdr || !(cdr._lView[FLAGS] & LViewFlags.FirstLViewPass)) {
-    // 此 effect 要么未在視圖注入器中執行，要么視圖已經進行了第一次變更偵測傳遞，這對於設定任何所需的輸入是必要的。
+    // This effect is either not running in a view injector, or the view has already
+    // undergone its first change detection pass, which is necessary for any required inputs to be
+    // set.
     handle.watcher.notify();
   } else {
-    // 將 effect 的初始化延遲到視圖完全初始化之後。
+    // Delay the initialization of the effect until the view is fully initialized.
     (cdr._lView[EFFECTS_TO_SCHEDULE] ??= []).push(handle.watcher.notify);
   }
 
@@ -811,26 +814,25 @@ export function effect(
 }
 ```
 
-以這種方式新增的通知函數將在此元件視圖在 `refreshView` 函數中首次執行變更偵測時執行一次：
+以這種方式新增的通知 functions 將在此 component 的視圖在 `refreshView` function 內部第一次運行 change detection 時執行一次：
 
 ```typescript
 export function refreshView<T>(tView,lView,templateFn,context) {
-   ...
-  
-   // 排程任何正在等待此視圖更新傳遞的 effects。
-    if (lView[EFFECTS_TO_SCHEDULE]) {
-      for (const notifyEffect of lView[EFFECTS_TO_SCHEDULE]) {
-        notifyEffect();
-      }
+  ...
 
-      // 一旦它們被執行，我們可以刪除陣列。
-      lView[EFFECTS_TO_SCHEDULE] = null;
+  // Schedule any effects that are waiting on the update pass of this view.
+  if (lView[EFFECTS_TO_SCHEDULE]) {
+    for (const notifyEffect of lView[EFFECTS_TO_SCHEDULE]) {
+      notifyEffect();
     }
-}
+
+    // Once they've been run, we can drop the array.
+    lView[EFFECTS_TO_SCHEDULE] = null;
+  }
 ```
 
-呼叫 `notifyEffect` 將觸發底層監看者的 `consumerMarkDirty` 通知回呼，而該監看者又將使用現有的排程器（在變更偵測之後）來排程 effect（使用者提供的回呼）執行：
+呼叫 `notifyEffect` 將觸發底層 watcher 的 `consumerMarkDirty` 通知 callback，而它反過來將使用現有的 scheduler (在 change detection 之後) 排程 effect (使用者提供的 callback) 運行：
 
-![圖片 30](https://wp.angular.love/wp-content/uploads/2024/08/1_BwgXXo4piUtwmCpAB9dWXw-300x87.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_BwgXXo4piUtwmCpAB9dWXw-300x87.webp)
 
-這就是整個故事 🙂
+這就是全部的故事了 🙂
