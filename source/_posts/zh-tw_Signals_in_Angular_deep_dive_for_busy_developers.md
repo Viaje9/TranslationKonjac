@@ -121,13 +121,13 @@ function producerUpdateValueVersion(node: ReactiveNode): void {
 
 這個呼叫堆疊也清楚地展示了這種實現：
 
-![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_o_jhWzaf9toobEpVXB37CQ-300x141.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_o_jhWzaf9toobEpVXB37CQ.webp)
 
 因此，當 computed 的 callback 正在執行時，在該 consumer 處於 active 狀態期間查詢的每個 producer 都會知道它們是在 reactive context 中執行的。在特定 consumer 的 reactive context 中執行的所有 producers 都會作為 consumer 的 dependencies 添加。這構成了一個 reactive graph。
 
 Angular 中的大多數預先存在的功能都是在非 reactive context 中執行的。你可以通過簡單地搜尋 `setActiveConsumer` 的 null 值用法來觀察到這一點：
 
-![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_AWAf6lmiOOr8VCNtGI3jYg-300x176.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_AWAf6lmiOOr8VCNtGI3jYg.webp)
 
 例如，在運行 lifecycle hooks 之前，Angular 會清除 reactive context：
 
@@ -286,7 +286,7 @@ export class AppComponent {
 
 將產生以下 graph：
 
-![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_vDJV8hF-twTuf1GckjPnZQ-300x123.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_vDJV8hF-twTuf1GckjPnZQ.webp)
 
 通過 active consumer 實現的 reactive context 可以實現動態 dependency 追蹤。當將特定 consumer 設定為 active 時，被評估的 producers 是通過這些 producers 呼叫的順序動態定義的。每次在該 consumer 的 reactive context 中存取 producer 時，都可以為 ActiveConsumer 重新排列 dependency 列表。
 
@@ -478,7 +478,7 @@ watcher.notify();
 
 一旦我們更新 `a.set(1)` 的值，我們就可以看到 live consumers 的通知正在執行：
 
-![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_39Jgsu7ROYU5MEoWGnMF8w-300x181.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_39Jgsu7ROYU5MEoWGnMF8w.webp)
 
 Nodes `b` 和 `c` 是 node `a` 的 live consumers，因此當為 `a` 運行更新時，Angular 將會遍歷 `node.liveConsumerNode` 並通知這些 nodes 變更。
 
@@ -574,11 +574,11 @@ const REACTIVE_LVIEW_CONSUMER_NODE: Omit<ReactiveLViewConsumer, 'lView'> = {
 
 在我們的範例中，每當 template function 作為 change detection 的一部分運行時，它會在 template function node 的 context 中執行 `ctx.value()` producer，該 node 作為 `ActiveConsumer`：
 
-![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_qeeISKeap4-Oo6WlikyPZQ-300x204.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_qeeISKeap4-Oo6WlikyPZQ.webp)
 
 這將導致 template expression node (consumer) 作為 live dependency 添加到 producer `value()`：
 
-![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_O9Cqy1y_Q8rnwxpu84BieA-300x173.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_O9Cqy1y_Q8rnwxpu84BieA.webp)
 
 此 dependency 可確保一旦 producer `counter` 的值發生變更，它將立即通知 consumer node (template expression)。
 
@@ -710,7 +710,7 @@ setTimeout(() => this.counter.set(1), 3000);
 
 您可以在這裡看到實際操作：
 
-![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_FwpksG4QvcTYICQ6mHRChg-300x96.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_FwpksG4QvcTYICQ6mHRChg.webp)
 
 當我們運行 `this.counter.set(1)` 時，相同的呼叫鏈會導致排程使用者提供的 callback 運行。
 
@@ -833,6 +833,6 @@ export function refreshView<T>(tView,lView,templateFn,context) {
 
 呼叫 `notifyEffect` 將觸發底層 watcher 的 `consumerMarkDirty` 通知 callback，而它反過來將使用現有的 scheduler (在 change detection 之後) 排程 effect (使用者提供的 callback) 運行：
 
-![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_BwgXXo4piUtwmCpAB9dWXw-300x87.webp)
+![alt text](https://wp.angular.love/wp-content/uploads/2024/08/1_BwgXXo4piUtwmCpAB9dWXw.webp)
 
 這就是全部的故事了 🙂
