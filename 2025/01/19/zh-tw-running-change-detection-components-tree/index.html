@@ -1,0 +1,196 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>執行變更偵測 – 元件樹 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/running-change-detection-components-tree
+在 Angular 中執行變更偵測 - 元件樹 - 它是什麼？元件樹 (Components tree)在 Web 應用程式中，基於元件的方法通過在模板中包含子元件來實現組合。因此，我們可以將 Angular 應用程式視為元件樹 (Components tree)。然而，在底層，對於元件，Angular 使用一個稱為 View 的低階抽象。View 是最小的元素分組，可以一起建立和銷毀。所有操作（如屬性檢查和 DOM 更新）都在 View 上執行，因此更準確地說，Angular 是一個 View 的樹，而元件可以描述為 View 的更高層級概念。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="執行變更偵測 – 元件樹"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">執行變更偵測 – 元件樹</h1>
+  
+
+      
+        <time datetime="2025-01-19T07:40:20.000Z">2025-01-19</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/running-change-detection-components-tree">https://angular.love/running-change-detection-components-tree</a></p>
+<h1 id="在-Angular-中執行變更偵測-元件樹-它是什麼？"><a href="#在-Angular-中執行變更偵測-元件樹-它是什麼？" class="headerlink" title="在 Angular 中執行變更偵測 - 元件樹 - 它是什麼？"></a>在 Angular 中執行變更偵測 - 元件樹 - 它是什麼？</h1><h2 id="元件樹-Components-tree"><a href="#元件樹-Components-tree" class="headerlink" title="元件樹 (Components tree)"></a>元件樹 (Components tree)</h2><p>在 Web 應用程式中，基於元件的方法通過在模板中包含子元件來實現組合。<br>因此，我們可以將 Angular 應用程式視為元件樹 (Components tree)。<br>然而，在底層，對於元件，Angular 使用一個稱為 <code>View</code> 的低階抽象。<br><code>View</code> 是最小的元素分組，可以一起建立和銷毀。<br>所有操作（如屬性檢查和 DOM 更新）都在 <code>View</code> 上執行，<br><strong>因此更準確地說，Angular 是一個 <code>View</code> 的樹</strong>，<br>而元件可以描述為 <code>View</code> 的更高層級概念。</p>
+<span id="more"></span>
+
+<p><code>View</code> 的結構由 <code>LView</code> 介面定義。<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L79">LView</a><br>儲存了在模板中呼叫指令時處理指令所需的所有資訊。<br>每個元件和嵌入式 <code>View</code> 都有其對應的 <code>LView</code>。<br>我們可以將為元件建立的 <code>View</code> 稱為元件 <code>View</code> (Component view)，以便與通過<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/a6d5fe202cafb419f3beb8d09711132124b6aa9a/packages/core/src/linker/view_container_ref.ts#L52">ViewContainerRef</a> 使用 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/5509e3512f9542896dbbc267752a5034be6df9f6/packages/core/src/linker/template_ref.ts#L39">template references</a><br>（即 <code>ng-template</code> 元素）建立的嵌入式 <code>View</code> (Embedded view) 區分開來。</p>
+<p><code>View</code> 的層次結構使用 <code>LView</code> 上的指定屬性進行追蹤：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="variable constant_">PARENT</span> = <span class="number">3</span>;</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="variable constant_">NEXT</span> = <span class="number">4</span>;</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="variable constant_">CHILD_HEAD</span> = <span class="number">13</span>;</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="variable constant_">CHILD_TAIL</span> = <span class="number">14</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">interface</span> <span class="title class_">LView</span> &#123;</span><br><span class="line">  [<span class="variable constant_">CHILD_HEAD</span>]: <span class="title class_">LView</span> | <span class="title class_">LContainer</span> | <span class="literal">null</span>;</span><br><span class="line">  [<span class="variable constant_">CHILD_TAIL</span>]: <span class="title class_">LView</span> | <span class="title class_">LContainer</span> | <span class="literal">null</span>;</span><br><span class="line">  [<span class="variable constant_">PARENT</span>]: <span class="title class_">LView</span> | <span class="title class_">LContainer</span> | <span class="literal">null</span>;</span><br><span class="line">  [<span class="variable constant_">NEXT</span>]: <span class="title class_">LView</span> | <span class="title class_">LContainer</span> | <span class="literal">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>為了遍歷 <code>View</code> 的樹，Angular 使用了這些<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/a98fa489fb498273bdfde2fa4598893d1d53582e/packages/core/src/render3/util/view_traversal_utils.ts">traversal utils</a>。</p>
+<p>Angular 還實現了<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L519">TView</a><br>資料結構，用於保存 <code>LView</code> 的靜態資料。此 <code>TView</code> 在給定型別的所有 <code>LView</code> 之間共享。<br>這意味著特定元件的每個實例都有其自己的 <code>LView</code> 實例，<br>但它們都引用相同的 <code>TView</code> 實例。</p>
+<p>我們需要知道的最後一點是，Angular 有幾種不同的 <code>View</code> 型別<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L492">定義</a><br>如下：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="keyword">enum</span> <span class="title class_">TViewType</span> &#123;</span><br><span class="line">  <span class="title class_">Root</span> = <span class="number">0</span>,</span><br><span class="line">  <span class="title class_">Component</span> = <span class="number">1</span>,</span><br><span class="line">  <span class="title class_">Embedded</span> = <span class="number">2</span>,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>Component</code> 和 <code>Embedded</code> <code>View</code> 型別應該是不言自明的。<br><code>Root</code> <code>View</code> 是一種特殊型別的 <code>View</code>，Angular 用於引導頂層元件。<br>它與 <code>LView</code> 結合使用，<code>LView</code> 接受一個不屬於 Angular 的現有 DOM 節點並將其封裝在 <code>LView</code> 中，<br>以便可以將其他元件載入到其中。</p>
+<p><code>View</code> 和元件之間存在直接關係 - 一個 <code>View</code> 與一個元件相關聯，反之亦然。<br><code>View</code> 在 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L36">CONTEXT</a> 屬性中保存對相關元件類別實例的<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L172">參考</a>。<br>所有操作（如屬性檢查和 DOM 更新）都在 <code>View</code> 上執行。</p>
+<p>對於包含 <code>A</code> 元件兩次的模板，資料結構將如下所示：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/1-10.png" alt="Image 18: Image alt"></p>
+<h2 id="變更偵測樹-Change-detection-tree"><a href="#變更偵測樹-Change-detection-tree" class="headerlink" title="變更偵測樹 (Change detection tree)"></a>變更偵測樹 (Change detection tree)</h2><p>在大多數應用程式中，您有一個主要的元件 <code>View</code> 樹，它從您在 <code>index.html</code> 中引用的元件開始。<br>還有其他通過 <a target="_blank" rel="noopener" href="https://material.angular.io/cdk/portal/overview">portals</a> 建立的 <code>Root</code> <code>View</code>，<br>主要用於模式對話框、工具提示等。<br>這些是需要呈現在主樹層次結構之外的 UI 元素，主要是出於樣式目的，<br>例如，使它們不受 <code>overflow:hidden</code> 的影響。</p>
+<p>Angular 將此類樹的頂層元素保存在<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/ff84c7360334792a9a422bd0fa0353e0cf670525/packages/core/src/application_ref.ts#L720">ApplicationRef</a> 的 <code>_views</code> 屬性中。<br>這些樹被稱為變更偵測樹，因為當 Angular 全域執行變更偵測時，會遍歷這些樹。<br>執行變更偵測的 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/ff84c7360334792a9a422bd0fa0353e0cf670525/packages/core/src/application_ref.ts#L1001">tick</a><br>方法會迭代 <code>_views</code> 中的每個樹，<br>並通過呼叫 <code>detectChanges</code> 方法對每個 <code>View</code> 執行檢查：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Injectable</span>(&#123; <span class="attr">providedIn</span>: <span class="string">&#x27;root&#x27;</span> &#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ApplicationRef</span> &#123;</span><br><span class="line">  <span class="title function_">tick</span>(): <span class="built_in">void</span> &#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">_runningTick</span> = <span class="literal">true</span>;</span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">let</span> view <span class="keyword">of</span> <span class="variable language_">this</span>.<span class="property">_views</span>) &#123;</span><br><span class="line">        view.<span class="title function_">detectChanges</span>();</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">if</span> (<span class="keyword">typeof</span> ngDevMode === <span class="string">&#x27;undefined&#x27;</span> || ngDevMode) &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">let</span> view <span class="keyword">of</span> <span class="variable language_">this</span>.<span class="property">_views</span>) &#123;</span><br><span class="line">          view.<span class="title function_">checkNoChanges</span>();</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (e) &#123; ... &#125; <span class="keyword">finally</span> &#123; ... &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>您還可以看到 <code>tick</code> 在同一組 <code>View</code> 上執行 <code>checkNoChanges</code> 方法。</p>
+<h2 id="將動態-View-附加到-ApplicationRef"><a href="#將動態-View-附加到-ApplicationRef" class="headerlink" title="將動態 View 附加到 ApplicationRef"></a>將動態 <code>View</code> 附加到 <code>ApplicationRef</code></h2><p>Angular 允許將元件呈現在 Angular 變更偵測樹之外的獨立 DOM 元素中。<br>但是由於這些 <code>View</code> 也需要進行檢查，因此 <code>ApplicationRef</code> 實現了 <code>attachView()</code> 和 <code>detachView()</code> 方法<br>來向變更偵測樹中新增&#x2F;移除獨立 <code>View</code>。<br>這實際上將這些 <code>View</code> 新增到變更偵測期間遍歷的 <code>_views</code> 陣列中。</p>
+<p>讓我們看看這個例子。我們有一個 <code>M</code> 元件，我們想動態實例化它，<br>然後將其呈現在主 Angular 樹之外的 DOM 中。以下是我們的做法：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;l-cmp&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">&#x27;L&#x27;</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">L</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">moduleRef</span>: <span class="title class_">NgModuleRef</span>&lt;<span class="built_in">any</span>&gt;, <span class="attr">appRef</span>: <span class="title class_">ApplicationRef</span></span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> factory =</span><br><span class="line">      moduleRef.<span class="property">componentFactoryResolver</span>.<span class="title function_">resolveComponentFactory</span>(M);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">let</span> newNode = <span class="variable language_">document</span>.<span class="title function_">createElement</span>(<span class="string">&#x27;div&#x27;</span>);</span><br><span class="line">    newNode.<span class="property">id</span> = <span class="string">&#x27;placeholder&#x27;</span>;</span><br><span class="line">    <span class="variable language_">document</span>.<span class="property">body</span>.<span class="title function_">prepend</span>(newNode);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">const</span> ref = factory.<span class="title function_">create</span>(moduleRef.<span class="property">injector</span>, [], newNode);</span><br><span class="line">    appRef.<span class="title function_">attachView</span>(ref.<span class="property">hostView</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;m-cmp&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">&#x27;&#123;&#123;title&#125;&#125;&#x27;</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">M</span> &#123;</span><br><span class="line">  title = <span class="string">&#x27;I am the component that was created dynamically&#x27;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果我們檢查應用程式中的 DOM 結構，我們將看到以下內容：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/2-12.png" alt="Image 19: Image alt"></p>
+<p>如果我們現在檢視 <code>_views</code> 屬性，我們將看到以下內容：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/3-9.png" alt="Image 20: Image alt"></p>
+<p>我們可以使用控制台來找出這些 <code>RootViewRef</code> 實例代表什麼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> <span class="variable constant_">TVIEW</span> = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">const</span> <span class="variable constant_">CONTEXT</span> = <span class="number">8</span>;</span><br><span class="line"><span class="keyword">const</span> <span class="variable constant_">CHILD_HEAD</span> = <span class="number">13</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> view_1 = appRef.<span class="property">_views</span>[<span class="number">0</span>];</span><br><span class="line"><span class="keyword">const</span> view_2 = appRef.<span class="property">_views</span>[<span class="number">1</span>];</span><br><span class="line"></span><br><span class="line">view_1.<span class="property">_lView</span>[<span class="variable constant_">TVIEW</span>].<span class="property">type</span> <span class="comment">// 0 - HostView</span></span><br><span class="line">view_1.<span class="property">_lView</span>[<span class="variable constant_">CONTEXT</span>].<span class="property">constructor</span>.<span class="property">name</span> <span class="comment">// M</span></span><br><span class="line"></span><br><span class="line">view_1.<span class="property">_lView</span>[<span class="variable constant_">CHILD_HEAD</span>][<span class="variable constant_">TVIEW</span>].<span class="property">type</span> <span class="comment">// 0 - HostView</span></span><br><span class="line">view_1.<span class="property">_lView</span>[<span class="variable constant_">CHILD_HEAD</span>][<span class="variable constant_">CONTEXT</span>].<span class="property">constructor</span>.<span class="property">name</span> <span class="comment">// M</span></span><br><span class="line"></span><br><span class="line">view_2.<span class="property">_lView</span>[<span class="variable constant_">CONTEXT</span>].<span class="property">constructor</span>.<span class="property">name</span> <span class="comment">// AppComponent (RootView)</span></span><br><span class="line">view_2.<span class="property">_lView</span>[<span class="variable constant_">TVIEW</span>].<span class="property">type</span> <span class="comment">// 0 - HostView</span></span><br><span class="line"></span><br><span class="line">view_2.<span class="property">_lView</span>[<span class="variable constant_">CHILD_HEAD</span>][<span class="variable constant_">CONTEXT</span>].<span class="property">constructor</span>.<span class="property">name</span> <span class="comment">// AppComponent (ComponentView)</span></span><br><span class="line">view_2.<span class="property">_lView</span>[<span class="variable constant_">CHILD_HEAD</span>][<span class="variable constant_">TVIEW</span>].<span class="property">type</span> <span class="comment">// 1 - ComponentView</span></span><br><span class="line"></span><br><span class="line">view_2.<span class="property">_lView</span>[<span class="variable constant_">CHILD_HEAD</span>][<span class="variable constant_">CHILD_HEAD</span>][<span class="variable constant_">CONTEXT</span>].<span class="property">constructor</span>.<span class="property">name</span> <span class="comment">// L</span></span><br></pre></td></tr></table></figure>
+
+<p>該圖表將更清楚地顯示這些關係：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/4-10.png" alt="Image 21: Image alt"></p>
+<h2 id="引導多個根元件"><a href="#引導多個根元件" class="headerlink" title="引導多個根元件"></a>引導多個根元件</h2><p>可以像這樣引導多個根元件：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@NgModule</span>(&#123;</span><br><span class="line">  <span class="attr">declarations</span>: [<span class="title class_">AppComponent</span>, <span class="title class_">AppRootAnother</span>],</span><br><span class="line">  <span class="attr">imports</span>: [<span class="title class_">BrowserModule</span>],</span><br><span class="line">  <span class="attr">bootstrap</span>: [<span class="title class_">AppComponent</span>, <span class="title class_">AppRootAnother</span>],</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppModule</span> &#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這將建立兩個 <code>Root</code> <code>View</code> 和相應的 html 標籤：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/5-9.png" alt="Image 22: Image alt"></p>
+<p>唯一要記住的是 <code>index.html</code> 應該包含兩個選擇器的標籤：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;!DOCTYPE <span class="keyword">html</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">html</span> <span class="attr">lang</span>=<span class="string">&quot;en&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">head</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">meta</span> <span class="attr">charset</span>=<span class="string">&quot;utf-8&quot;</span> /&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">title</span>&gt;</span>LearnAngular<span class="tag">&lt;/<span class="name">title</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">head</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">body</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">app-root</span>&gt;</span><span class="tag">&lt;/<span class="name">app-root</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">app-root-another</span>&gt;</span><span class="tag">&lt;/<span class="name">app-root-another</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">body</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">html</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>通過此設定，Angular 將建立兩個獨立的變更偵測樹。<br>它們將在 <code>ApplicationRef._views</code> 下註冊，當 <code>ApplicationRef.tick()</code> 函數被呼叫時，<br>Angular 將對兩個樹執行變更偵測。這實際上類似於使用<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/ff84c7360334792a9a422bd0fa0353e0cf670525/packages/core/src/application_ref.ts#L1032">attachView</a>。<br>但是，它們仍然是單個 <code>ApplicationRef</code> 的一部分，因此它們將共享為 <code>AppModule</code> 定義的注入器。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

@@ -1,0 +1,425 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://itnext.io/a-change-detection-zone-js-zoneless-local-change-detection-and-signals-story-9344079c3b9d
+一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚
+Photo by Mark Boss on Unsplash">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚</h1>
+  
+
+      
+        <time datetime="2024-12-24T10:40:14.000Z">2024-12-24</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://itnext.io/a-change-detection-zone-js-zoneless-local-change-detection-and-signals-story-9344079c3b9d">https://itnext.io/a-change-detection-zone-js-zoneless-local-change-detection-and-signals-story-9344079c3b9d</a></p>
+<h1 id="一個關於變更偵測、zone-js、無-Zone、局部變更偵測和-Signals-的故事-📚"><a href="#一個關於變更偵測、zone-js、無-Zone、局部變更偵測和-Signals-的故事-📚" class="headerlink" title="一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚"></a>一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚</h1><p><img src="https://miro.medium.com/v2/resize:fit:700/1*N0FoEeuERFDvvkuOzhgOJA.png" alt="Image 71"></p>
+<p>Photo by <a target="_blank" rel="noopener" href="https://unsplash.com/@vork?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Mark Boss</a> on <a target="_blank" rel="noopener" href="https://unsplash.com/photos/traffic-light-gHkKgHX0fbE?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Unsplash</a></p>
+<span id="more"></span>
+
+<p>Angular 是一個元件驅動的框架。就像其他所有框架一樣，它應該向使用者顯示資料，並在資料變更時刷新視圖。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:667/1*eVpyKXodMU9thMSDn1XY4Q.png" alt="Image 72"></p>
+<p>一個在範本中顯示使用者資料的 UserCard 元件</p>
+<p>隨著時間的推移，我們建立越來越多的元件並將它們組合在一起，最終可能會得到如下的元件樹。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*QbEmmWPDvOTKw60oW-RKmw.png" alt="Image 73"></p>
+<p>元件結構</p>
+<p>但是，Angular 如何知道何時刷新視圖？它如何知道資料何時變更？它如何知道何時執行變更偵測？</p>
+<h2 id="使用同步程式碼進行變更偵測"><a href="#使用同步程式碼進行變更偵測" class="headerlink" title="使用同步程式碼進行變更偵測"></a><strong>使用同步程式碼進行變更偵測</strong></h2><p>讓我們先從一個簡單的範例開始。我們有一個具有 <strong>name</strong> 屬性和 <strong>changeName</strong> 方法的元件。當我們點擊按鈕時，我們呼叫 <strong>changeName</strong> 方法並變更 <strong>name</strong> 屬性。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`</span></span><br><span class="line"><span class="string">    &lt;button (click)=&quot;changeName()&quot;&gt;Change name&lt;/button&gt;</span></span><br><span class="line"><span class="string">    &lt;p&gt;&#123;&#123; name &#125;&#125;&lt;/p&gt;</span></span><br><span class="line"><span class="string">  `</span></span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  name = <span class="string">&#x27;John&#x27;</span>;</span><br><span class="line">  <span class="title function_">changeName</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">name</span> = <span class="string">&#x27;Jane&#x27;</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>當我們點擊按鈕時，會呼叫 <strong>changeName</strong> 方法，而且因為所有內容都由 Angular 包裝，我們可以安全地假設，在名稱變更後，Angular 可以執行一些程式碼來更新視圖（並且所有內容都將同步）。</p>
+<blockquote>
+<p>⚠️ 想像中的 Angular 底層程式碼：</p>
+</blockquote>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">component.<span class="title function_">changeName</span>();</span><br><span class="line"><span class="comment">// 執行此程式碼 Angular 將為整個元件樹執行變更偵測，因為我們可能已在其他元件使用的服務中更新了一些資料</span></span><br><span class="line">angular.<span class="title function_">runChangeDetection</span>();</span><br></pre></td></tr></table></figure>
+
+<p>這樣可以正常運作！但是，大多數時候，當我們變更資料時，我們不會同步執行。我們通常會發出 HTTP 請求，或使用一些計時器，或等待其他事件發生後再更新資料。這就是問題開始的地方。</p>
+<h2 id="使用非同步程式碼進行變更偵測"><a href="#使用非同步程式碼進行變更偵測" class="headerlink" title="使用非同步程式碼進行變更偵測"></a><strong>使用非同步程式碼進行變更偵測</strong></h2><p>現在，假設我們想要在 1 秒後變更名稱。我們可以使用 <strong>setTimeout</strong> 函式來完成。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`</span></span><br><span class="line"><span class="string">    &lt;button (click)=&quot;changeName()&quot;&gt;Change name&lt;/button&gt;</span></span><br><span class="line"><span class="string">    &lt;p&gt;&#123;&#123; name &#125;&#125;&lt;/p&gt;</span></span><br><span class="line"><span class="string">  `</span></span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  name = <span class="string">&#x27;John&#x27;</span>;</span><br><span class="line">  <span class="title function_">changeName</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">name</span> = <span class="string">&#x27;Jane&#x27;</span>;</span><br><span class="line">    &#125;, <span class="number">1000</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>當我們點擊按鈕時，會呼叫 <strong>changeName</strong> 方法，並呼叫 <strong>setTimeout</strong> 函式。<strong>setTimeout</strong> 函式將等待 1 秒，然後呼叫回呼函式。回呼函式會將名稱變更為 <strong>Jane</strong>。</p>
+<p>現在，讓我們加入與之前相同的想像中 Angular 底層程式碼。</p>
+<blockquote>
+<p>⚠️ 想像中的 Angular 底層程式碼：</p>
+</blockquote>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">component.<span class="title function_">changeName</span>(); <span class="comment">// 在內部使用 setTimeout</span></span><br><span class="line"><span class="comment">// 此程式碼在呼叫 changeName 方法後立即執行</span></span><br><span class="line">angular.<span class="title function_">runChangeDetection</span>();</span><br></pre></td></tr></table></figure>
+
+<p>由於 <strong>call stack</strong>，<strong>setTimeout</strong> 回呼將在 <strong>angular.runChangeDetection</strong> 方法之後呼叫。因此，Angular 執行了變更偵測，但名稱尚未變更。這就是為什麼視圖不會更新的原因。這是一個損壞的應用程式 ⚠️。（實際上並非如此，因為我們有 👇）</p>
+<h2 id="Zone-js-來救援"><a href="#Zone-js-來救援" class="headerlink" title="Zone.js 來救援"></a><strong>Zone.js 來救援</strong></h2><p>Zone.js 自 Angular 2.0 的早期就已存在。它是一個猴子補丁瀏覽器 API 的程式庫，使我們能夠加入瀏覽器事件的生命週期。這是什麼意思？這表示我們可以在瀏覽器事件之前和之後執行我們的程式碼。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&#x27;Hello world&#x27;</span>);</span><br><span class="line">&#125;, <span class="number">1000</span>);</span><br></pre></td></tr></table></figure>
+
+<p>上面的程式碼會在 1 秒後印出 <strong>Hello world</strong>。但是，如果我們想在 <strong>setTimeout</strong> 回呼之前或之後執行一些程式碼呢？<em>你知道，出於商業原因</em> 😄。一個稱為 <strong>Angular</strong> 的框架可能想在 <strong>setTimeout</strong> 回呼之前和之後執行一些程式碼。</p>
+<p><strong>Zone.js</strong> 使我們能夠做到這一點。我們可以建立一個 zone（Angular 也會建立一個 zone），並加入 <strong>setTimeout</strong> 回呼。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> zone = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">  <span class="attr">onInvokeTask</span>: <span class="function">(<span class="params">delegate, current, target, task, applyThis, applyArgs</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&#x27;Before setTimeout&#x27;</span>);</span><br><span class="line">    delegate.<span class="title function_">invokeTask</span>(target, task, applyThis, applyArgs);</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&#x27;After setTimeout&#x27;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>若要在 zone 內執行我們的 <strong>setTimeout</strong>，我們需要使用 <strong>zone.run()</strong> 方法。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">zone.<span class="title function_">run</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&#x27;Hello world&#x27;</span>);</span><br><span class="line">  &#125;, <span class="number">1000</span>);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>現在，當我們執行上面的程式碼時，我們將看到以下輸出。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Before setTimeout</span><br><span class="line">Hello world</span><br><span class="line">After setTimeout</span><br></pre></td></tr></table></figure>
+
+<p>這就是 zone.js 的運作方式。它會猴子補丁瀏覽器 API，並使我們能夠加入瀏覽器事件的生命週期。</p>
+<h2 id="Zone-js-Angular"><a href="#Zone-js-Angular" class="headerlink" title="Zone.js + Angular"></a><strong>Zone.js + Angular</strong></h2><p>Angular 預設會在每個應用程式中載入 <strong>zone.js</strong>，並建立一個名為 <strong>NgZone</strong> 的 zone。<strong>NgZone</strong> 包含一個名為 <strong>onMicrotaskEmpty</strong> 的 <strong>Observable</strong>。當佇列中沒有其他微任務時，此 observable 會發出值。Angular 就是利用這一點來知道何時所有非同步程式碼都已執行完成，並且可以安全地執行變更偵測。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*3Oe8-a_qFIOnAGEZsfM3vg.png" alt="Image 74"></p>
+<p>NgZone 今天包裝著每個 Angular 應用程式</p>
+<p>讓我們看看底層的 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/c4de4e1f894001d8f80b70297c5e576f2d11ec6f/packages/core/src/change_detection/scheduling/ng_zone_scheduling.ts#L31">程式碼</a>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ng_zone_scheduling.ts NgZoneChangeDetectionScheduler</span></span><br><span class="line"><span class="variable language_">this</span>.<span class="property">_onMicrotaskEmptySubscription</span> = <span class="variable language_">this</span>.<span class="property">zone</span>.<span class="property">onMicrotaskEmpty</span>.<span class="title function_">subscribe</span>(&#123;</span><br><span class="line">    <span class="attr">next</span>: <span class="function">() =&gt;</span> <span class="variable language_">this</span>.<span class="property">zone</span>.<span class="title function_">run</span>(<span class="function">() =&gt;</span> <span class="variable language_">this</span>.<span class="property">applicationRef</span>.<span class="title function_">tick</span>())</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>我們在上面的程式碼中看到的是，當 <strong>onMicrotaskEmpty</strong> observable 發出值時，Angular 將呼叫 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/c4de4e1f894001d8f80b70297c5e576f2d11ec6f/packages/core/src/application/application_ref.ts#L537"><strong>applicationRef.tick()</strong></a> 方法。這個 <strong>tick</strong> 方法是什麼 🤔？你還記得想像中的 Angular 底層程式碼中的 <strong>runChangeDetection</strong> 方法嗎？嗯，<strong>tick</strong> 方法就是 <strong>runChangeDetection</strong> 方法。它會為整個元件樹 <strong><em>同步</em></strong> 執行變更偵測。</p>
+<p>但現在，Angular 知道所有非同步程式碼都已執行完成，並且可以 <strong><em>安全地</em></strong> 執行變更偵測。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">tick</span>(): <span class="built_in">void</span> &#123;</span><br><span class="line">    <span class="comment">// 為了簡潔起見，已移除程式碼</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">let</span> view <span class="keyword">of</span> <span class="variable language_">this</span>.<span class="property">_views</span>) &#123;</span><br><span class="line">        <span class="comment">// 為單一元件執行變更偵測</span></span><br><span class="line">        view.<span class="title function_">detectChanges</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>tick</strong> 方法會反覆運算所有根視圖（大多數時候我們只有一個根視圖&#x2F;元件，即 <strong>AppComponent</strong>），並同步執行 <strong>detectChanges</strong>。</p>
+<h2 id="元件的髒標記"><a href="#元件的髒標記" class="headerlink" title="元件的髒標記"></a><strong>元件的髒標記</strong></h2><p>Angular 所做的另一件事是，當它知道元件內部的某些內容已變更時，會將元件標記為髒。</p>
+<p>以下是將元件標記為髒的內容：</p>
+<ul>
+<li>事件（點擊、滑鼠移過等等）</li>
+</ul>
+<p>每次我們點擊範本中帶有監聽器的按鈕時，Angular 都會使用一個名為 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/c4de4e1f894001d8f80b70297c5e576f2d11ec6f/packages/core/src/render3/instructions/listener.ts#L260"><strong>wrapListenerIn_markDirtyAndPreventDefault</strong></a> 的函式來包裝回呼函式。正如我們從函式名稱 😅 可以看到的那樣，它會將元件標記為髒。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">wrapListener</span>(<span class="params"></span>): <span class="title class_">EventListener</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="keyword">function</span> <span class="title function_">wrapListenerIn_markDirtyAndPreventDefault</span>(<span class="params"><span class="attr">e</span>: <span class="built_in">any</span></span>) &#123;</span><br><span class="line">    <span class="comment">// ... 為了簡潔起見，已移除程式碼</span></span><br><span class="line">    <span class="title function_">markViewDirty</span>(startView); <span class="comment">// 將元件標記為髒</span></span><br><span class="line">  &#125;;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>已變更的輸入</li>
+</ul>
+<p>此外，在執行變更偵測時，Angular 將檢查元件的輸入值是否已變更（<strong>=&#x3D;&#x3D;</strong> 檢查）。如果已變更，它會將元件標記為髒。<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/c4de4e1f894001d8f80b70297c5e576f2d11ec6f/packages/core/src/render3/component_ref.ts#L348">此處提供原始碼</a>。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">setInput</span>(<span class="attr">name</span>: <span class="built_in">string</span>, <span class="attr">value</span>: <span class="built_in">unknown</span>): <span class="built_in">void</span> &#123;</span><br><span class="line">    <span class="comment">// 如果輸入與最後的值相同，則不要設定輸入</span></span><br><span class="line">    <span class="keyword">if</span> (<span class="title class_">Object</span>.<span class="title function_">is</span>(<span class="variable language_">this</span>.<span class="property">previousInputValues</span>.<span class="title function_">get</span>(name), value)) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 為了簡潔起見，已移除程式碼</span></span><br><span class="line">    <span class="title function_">setInputsForProperty</span>(lView[<span class="variable constant_">TVIEW</span>], lView, dataValue, name, value);</span><br><span class="line">    <span class="title function_">markViewDirty</span>(childComponentLView); <span class="comment">// 將元件標記為髒</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>輸出發射</li>
+</ul>
+<p>若要在 Angular 中監聽輸出發射，我們會在範本中註冊事件。正如我們之前所看到的，回呼函式將被包裝，並且當事件發射時，元件將被標記為髒。</p>
+<p>讓我們看看這個 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/c4de4e1f894001d8f80b70297c5e576f2d11ec6f/packages/core/src/render3/instructions/mark_view_dirty.ts#L24"><strong>markViewDirty</strong></a> 函式的作用。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 將目前的視圖和所有祖先標記為髒。</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">markViewDirty</span>(<span class="params"><span class="attr">lView</span>: <span class="title class_">LView</span></span>): <span class="title class_">LView</span>|<span class="literal">null</span> &#123;</span><br><span class="line">  <span class="keyword">while</span> (lView) &#123;</span><br><span class="line">    lView[<span class="variable constant_">FLAGS</span>] |= <span class="title class_">LViewFlags</span>.<span class="property">Dirty</span>;</span><br><span class="line">    <span class="keyword">const</span> parent = <span class="title function_">getLViewParent</span>(lView);</span><br><span class="line">    <span class="comment">// 當您找到未附加到任何容器的根視圖時，停止向上遍歷</span></span><br><span class="line">    <span class="keyword">if</span> (<span class="title function_">isRootView</span>(lView) &amp;&amp; !parent) &#123;</span><br><span class="line">      <span class="keyword">return</span> lView;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 否則繼續</span></span><br><span class="line">    lView = parent!;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>正如我們從註解中讀到的，<strong>markViewDirty</strong> 函式會將目前的視圖和所有祖先標記為髒。讓我們看看下面的影像，以便更好地了解這表示什麼。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*vWR8BluUbvyEdbezRbhYLw.png" alt="Image 75"></p>
+<p>將元件及其祖先標記為髒到根</p>
+<p>因此，當我們點擊按鈕時，Angular 會呼叫我們的回呼函式 ( <em>changeName</em> )，並且因為它使用 <strong>wrapListenerIn_markDirtyAndPreventDefault</strong> 函式包裝，它會將元件標記為髒。</p>
+<p>正如我們之前所說，Angular 使用 zone.js 並使用它包裝我們的應用程式。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*qlIO2Wh0s9dSGhchJ9rh7g.png" alt="Image 76"></p>
+<p>NgZone 包裝著 Angular 應用程式</p>
+<p>在將髒標記到最上層之後，<strong>wrapListenerIn_markDirtyAndPreventDefault</strong> 會觸發並觸發 zone.js</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*DmRTN6SwNtGGqZA_E16Y_g.png" alt="Image 77"></p>
+<p>事件監聽器通知 zone.js</p>
+<p>因為 Angular 正在監聽 <strong>onMicrotaskEmpty</strong> observable，並且因為 <strong>(click)</strong> 註冊了一個事件監聽器，而 zone 已包裝了此事件監聽器，所以 zone 會知道事件監聽器已完成執行，並且可以向 <strong>onMicrotaskEmpty</strong> observable 發出一個值。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*I6ceCK5GilF6J65lvyqoAw.png" alt="Image 78"></p>
+<p>當沒有微任務在執行時，<strong>onMicrotaskEmpty</strong> 會觸發</p>
+<p><strong>onMicrotaskEmpty</strong> 告訴 Angular 是時候執行變更偵測了。</p>
+<h2 id="元件繫結刷新"><a href="#元件繫結刷新" class="headerlink" title="元件繫結刷新"></a><strong>元件繫結刷新</strong></h2><p>當 Angular 執行變更偵測時，它會從上到下檢查每個元件。它會檢查所有元件（<strong>髒</strong>和<strong>非髒</strong>），並檢查它們的繫結。如果繫結已變更，它會更新視圖。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*x08OitRwQ2qT7gIs3DF9bA.png" alt="Image 79"></p>
+<p>但是，為什麼 Angular 要檢查所有元件 🤔？為什麼不只檢查髒的元件 🤔？</p>
+<p>嗯，這是因為變更偵測策略。</p>
+<h2 id="OnPush-變更偵測"><a href="#OnPush-變更偵測" class="headerlink" title="OnPush 變更偵測"></a><strong>OnPush 變更偵測</strong></h2><p>Angular 有一個名為 <strong>OnPush</strong> 的變更偵測策略。當我們使用此策略時，Angular 將僅針對標記為髒的元件執行變更偵測。</p>
+<p>首先，讓我們將變更偵測策略變更為 <strong>OnPush</strong>。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="comment">// ...</span></span><br><span class="line">  <span class="attr">changeDetection</span>: <span class="title class_">ChangeDetectionStrategy</span>.<span class="property">OnPush</span></span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">UserCard</span> &#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>讓我們看看下面的圖形，以便更好地了解 <strong>OnPush</strong> 策略的變更偵測運作方式。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*zELCaBs7IW92PvceLa_IOA.png" alt="Image 80"></p>
+<p>現在有些元件標記為 <strong>OnPush（及其子元件隱含地為 OnPush 元件）</strong></p>
+<p>讓我們做與之前相同的事情。點擊元件中的按鈕並變更名稱。</p>
+<p>首先，我們將有<strong>髒標記階段</strong>。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*AeeeFm-_fHGjbFAACMr1hA.png" alt="Image 81"></p>
+<p>然後，事件監聽器將通知 zone.js。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*iP28hqjA-YdazbKm-zg_tA.png" alt="Image 82"></p>
+<p>事件通知 zone.js</p>
+<p>當所有非同步內容都執行完成後，<strong>onMicrotaskEmpty</strong> 將會觸發。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*frosM42uC9BbaC8P3fIS5g.png" alt="Image 83"></p>
+<p>現在，Angular 將執行 <strong>tick</strong> 方法，它將從上到下遍歷所有元件並檢查每個元件。</p>
+<p>如果元件是：</p>
+<ul>
+<li><strong>OnPush</strong> + <strong>非髒</strong> -&gt; <strong>略過</strong></li>
+<li><strong>OnPush</strong> + <strong>髒</strong> -&gt; <strong>檢查繫結</strong> -&gt; <strong>刷新繫結</strong> -&gt; <strong>檢查子元件</strong></li>
+</ul>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*Clr0BonprSL5sPAE-5JRTw.png" alt="Image 84"></p>
+<p>正如我們所看到的，藉由使用 <strong>OnPush</strong>，我們可以略過我們知道沒有任何變更的樹狀結構部分。</p>
+<h2 id="OnPush-Observables-async-pipe"><a href="#OnPush-Observables-async-pipe" class="headerlink" title="OnPush + Observables + async pipe"></a><strong>OnPush + Observables + async pipe</strong></h2><p>當我們使用 Angular 時，observables 一直是我們管理資料和狀態變更的首選工具。為了支援 observables，Angular 提供了 <strong>async</strong> pipe。<strong>async</strong> pipe 會訂閱 observable 並傳回最新的值。為了讓 Angular 知道值已變更，它會呼叫來自 <strong>ChangeDetectorRef</strong> 類別（元件的 <strong>ChangeDetectorRef</strong>）的 <strong>markForCheck</strong> 方法。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Pipe</span>()</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AsyncPipe</span> <span class="keyword">implements</span> <span class="title class_">OnDestroy</span>, <span class="title class_">PipeTransform</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">ref</span>: <span class="title class_">ChangeDetectorRef</span></span>) &#123;&#125;</span><br><span class="line">  transform&lt;T&gt;(<span class="attr">obj</span>: <span class="title class_">Observable</span>&lt;T&gt;): T|<span class="literal">null</span> &#123;</span><br><span class="line">    <span class="comment">// 為了簡潔起見，已移除程式碼</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span> <span class="title function_">_updateLatestValue</span>(<span class="attr">async</span>: <span class="built_in">any</span>, <span class="attr">value</span>: <span class="title class_">Object</span>): <span class="built_in">void</span> &#123;</span><br><span class="line">    <span class="comment">// 為了簡潔起見，已移除程式碼</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">_ref</span>!.<span class="title function_">markForCheck</span>(); <span class="comment">// &lt;\-- 將元件標記為檢查</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我在此處撰寫了更多相關資訊（從頭開始建立 async pipe 並了解它的運作方式）：</p>
+<p><strong>markForCheck</strong> 方法的作用是，它只會呼叫我們之前看到的 <strong>markViewDirty</strong> 函式。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// view_ref.ts</span></span><br><span class="line"><span class="title function_">markForCheck</span>(): <span class="built_in">void</span> &#123;</span><br><span class="line">  <span class="title function_">markViewDirty</span>(<span class="variable language_">this</span>.<span class="property">_cdRefInjectingView</span> || <span class="variable language_">this</span>.<span class="property">_lView</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因此，與之前相同，如果我們在範本中使用帶有 <strong>async</strong> pipe 的 observables，它的作用方式會與我們使用 <strong>(click)</strong> 事件時相同。它會將元件標記為髒，而 Angular 會執行變更偵測。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*LRpedou2RqKPanLTPRUbTQ.png" alt="Image 85"></p>
+<p>data$ | async pipe 將元件標記為髒</p>
+<h2 id="OnPush-Observables-誰在觸發-zone-js？"><a href="#OnPush-Observables-誰在觸發-zone-js？" class="headerlink" title="OnPush + Observables + 誰在觸發 zone.js？"></a>OnPush + Observables + 誰在觸發 zone.js？</h2><p>如果我們的資料在沒有我們互動的情況下變更（點擊、滑鼠移過等等），則可能在底層的某處有 <strong>setTimeout</strong> 或 <strong>setInterval</strong> 或正在發出的 HTTP 呼叫觸發了 zone.js。</p>
+<p>以下是我們可以輕鬆破壞它的方式 🧨</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;todos&#x27;</span>,</span><br><span class="line">  <span class="attr">standalone</span>: <span class="literal">true</span>,</span><br><span class="line">  <span class="attr">imports</span>: [<span class="title class_">AsyncPipe</span>, <span class="title class_">JsonPipe</span>],</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`&#123;&#123; todos$ | async | json &#125;&#125;`</span>,</span><br><span class="line">  <span class="attr">changeDetection</span>: <span class="title class_">ChangeDetectionStrategy</span>.<span class="property">OnPush</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">TodosComponent</span> &#123;</span><br><span class="line">  <span class="keyword">private</span> http = <span class="title function_">inject</span>(<span class="title class_">HttpClient</span>);</span><br><span class="line">  <span class="keyword">private</span> ngZone = <span class="title function_">inject</span>(<span class="title class_">NgZone</span>);</span><br><span class="line"></span><br><span class="line">  todos$ = <span class="title function_">of</span>([] <span class="keyword">as</span> <span class="built_in">any</span>[]);</span><br><span class="line"></span><br><span class="line">  <span class="title function_">ngOnInit</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">ngZone</span>.<span class="title function_">runOutsideAngular</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">        <span class="comment">// 這將會更新，但沒有任何內容觸發 zonejs</span></span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">todos$</span> = <span class="variable language_">this</span>.<span class="title function_">getTodos</span>();</span><br><span class="line">      &#125;);</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">getTodos</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">http</span></span><br><span class="line">      .<span class="property">get</span>&lt;<span class="built_in">any</span>&gt;(<span class="string">&#x27;https://jsonplaceholder.typicode.com/todos/1&#x27;</span>)</span><br><span class="line">      .<span class="title function_">pipe</span>(<span class="title function_">shareReplay</span>(<span class="number">1</span>));</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我們在這裡所做的事情是：</p>
+<ul>
+<li>在 <strong>ngOnInit</strong> 中，我們使用了 <strong>ngZone.runOutsideAngular()</strong>，這是一個允許我們在 Angular zone 之外執行內容的 API。</li>
+<li>我們使用 <strong>setTimeout</strong>（略過第一個要執行的任務，而且因為 Angular 預設至少會執行一次變更偵測），並且在 <strong>setTimeout</strong> 內部，我們將值指派給 observable（耶，我們有變更）。</li>
+<li>因為 <strong>setTimeout</strong> 不會在 zone 內執行，所以 API 呼叫也會在 zone 之外執行，因為程式碼在 <strong>runOutsideAngular</strong> 內部執行，所以沒有任何內容通知 zonejs 某些內容已變更。</li>
+<li>在您的應用程式中執行此程式碼，並查看瀏覽器中只會顯示 “<strong>[]</strong>“。</li>
+<li><strong>損壞的狀態 🧨！</strong></li>
+</ul>
+<p>不太好 😄！但是，我們開始質疑的另一件事是：</p>
+<h2 id="為什麼我們需要將所有祖先標記為髒？"><a href="#為什麼我們需要將所有祖先標記為髒？" class="headerlink" title="為什麼我們需要將所有祖先標記為髒？"></a><strong>為什麼我們需要將所有祖先標記為髒？</strong></h2><p>這樣做的原因很簡單，如果我們不將所有祖先標記為髒，我們甚至可以更快地進入損壞的狀態。如何？</p>
+<p>讓我們再次查看上面的範例，但現在，只將元件及其子元件標記為髒。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*WR3R89nCi2ej-J0JDBUKjg.png" alt="Image 86"></p>
+<p>因此，我們只將發生點擊的元件及其子元件標記為檢查。<strong>tick</strong> 發生時，它將到達身為 <strong>OnPush</strong> 的父元件，檢查它是否未變更，然後略過它。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*eTO0ASGOnxsQm9sW-i6EVQ.png" alt="Image 87"></p>
+<p>如果我們在使用 markForCheck 時不將祖先標記為髒，則會損壞狀態</p>
+<p>這就是我們如何再次進入損壞狀態 🧨！</p>
+<h2 id="為什麼我們不能只針對標記為髒的元件執行變更偵測？"><a href="#為什麼我們不能只針對標記為髒的元件執行變更偵測？" class="headerlink" title="為什麼我們不能只針對標記為髒的元件執行變更偵測？"></a><strong>為什麼我們不能只針對標記為髒的元件執行變更偵測？</strong></h2><p>我們可以使用 <strong>ChangeDetectorRef</strong> 類別中的 <strong>detectChanges</strong> 方法來做到這一點。但是它有其缺點。因為該方法會同步執行變更偵測，所以可能會導致效能問題。因為所有內容都將在相同的瀏覽器任務中完成，所以可能會封鎖主執行緒並導致卡頓。想像一下，每 1 或 2 秒偵測 100 個項目的清單的變更。這對瀏覽器來說是很多工作。</p>
+<h2 id="markForCheck-與-detectChanges-合併執行與同步執行"><a href="#markForCheck-與-detectChanges-合併執行與同步執行" class="headerlink" title="markForCheck 與 detectChanges (合併執行與同步執行)"></a><strong>markForCheck 與 detectChanges (合併執行與同步執行)</strong></h2><p>當我們使用 markForCheck 時，我們只會告訴 Angular 有一個元件是髒的，不會發生其他任何事情，因此即使我們呼叫 markForCheck 1000 次，也不會有問題。但是，當我們使用 <strong>detectChanges</strong> 時，Angular 會執行實際工作，例如檢查繫結，並在需要時更新視圖。這就是為什麼我們應該使用 <strong>markForCheck</strong> 而不是 <strong>detectChanges</strong> 的原因。</p>
+<h2 id="我們是否無法在下一個瀏覽器任務中排定-detectChanges-的行程？"><a href="#我們是否無法在下一個瀏覽器任務中排定-detectChanges-的行程？" class="headerlink" title="我們是否無法在下一個瀏覽器任務中排定 detectChanges 的行程？"></a><strong>我們是否無法在下一個瀏覽器任務中排定</strong> detectChanges <strong>的行程？</strong></h2><p>我們可以，這就是 <a target="_blank" rel="noopener" href="https://www.rx-angular.io/docs/template/api/push-pipe"><strong>push pipe</strong></a> 或 <a target="_blank" rel="noopener" href="https://www.rx-angular.io/docs/template/api/rx-let-directive"><strong>rxLet</strong></a> 指示詞（來自 <a target="_blank" rel="noopener" href="https://www.rx-angular.io/"><strong>rx-angular</strong></a>）的作用。它會在下一個瀏覽器任務中排定變更偵測的行程。但是，針對每個元件執行此操作並不是一個好主意。因為如果我們有 100 個項目的清單，並且我們為每個項目排定變更偵測的行程，我們將有 100 個瀏覽器任務。這對效能也不好。</p>
+<h2 id="Signals-🚦"><a href="#Signals-🚦" class="headerlink" title="Signals 🚦"></a>Signals 🚦</h2><p>前端世界正朝向 signals 發展。Solid.js、Svelte、Vue 和 Angular 正在建立其 signal 實作。這是因為 signals 是<strong>管理狀態</strong>和<strong>狀態變更</strong>的更好方式。</p>
+<p>Angular 中的 Signals 帶來了許多 <strong>DX</strong> 優勢。我們可以輕鬆建立和衍生狀態，並在狀態使用 effects 變更時執行副作用。我們不必訂閱它們，不必取消訂閱它們，也不必擔心記憶體流失 🧯。</p>
+<p>我們只需要呼叫它們，它們就會傳回目前的值。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> name = <span class="title function_">signal</span>(<span class="string">&#x27;John&#x27;</span>); <span class="comment">// 使用初始值建立 signal</span></span><br><span class="line"><span class="keyword">const</span> upperCaseName = <span class="title function_">computed</span>(<span class="function">() =&gt;</span> <span class="title function_">name</span>().<span class="title function_">toUpperCase</span>()); <span class="comment">// 建立計算的 signal</span></span><br><span class="line"><span class="title function_">effect</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title function_">name</span>() + <span class="string">&#x27; &#x27;</span> + <span class="title function_">upperCaseName</span>()); <span class="comment">// 當名稱或 upperCaseName 變更時，執行副作用</span></span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">name.<span class="title function_">set</span>(<span class="string">&#x27;Jane&#x27;</span>); <span class="comment">// 變更名稱</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 輸出：</span></span><br><span class="line"><span class="comment">// John JOHN</span></span><br><span class="line"><span class="comment">// Jane JANE</span></span><br></pre></td></tr></table></figure>
+
+<p>我們也可以在範本中使用 signals，就像正常的函式呼叫一樣。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`</span></span><br><span class="line"><span class="string">    &lt;button (click)=&quot;name.set(&#x27;Jane&#x27;)&quot;&gt;Change name&lt;/button&gt;</span></span><br><span class="line"><span class="string">    &lt;p&gt;&#123;&#123; name() &#125;&#125;&lt;/p&gt;</span></span><br><span class="line"><span class="string">  `</span></span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  name = <span class="title function_">signal</span>(<span class="string">&#x27;John&#x27;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果您問說，在範本中呼叫函式是否是個好主意，我會說，如果函式呼叫很便宜，那就是個好主意，而呼叫 signal 很便宜。它只是一個傳回值的函式呼叫（沒有計算任何內容）。</p>
+<p>我在此處也撰寫了相關資訊：</p>
+<h2 id="Signals-和變更偵測"><a href="#Signals-和變更偵測" class="headerlink" title="Signals 和變更偵測"></a>Signals 和變更偵測</h2><p>在 v17 中，Angular 的變更偵測得到了升級 🚀！</p>
+<p>Angular 範本現在將 signals 理解為不只是函式呼叫。以下是使此成為現實的其中一個 PR。</p>
+<p>在我們使用 <strong>async</strong> pipe 之前，它會呼叫 <strong>markForCheck</strong> 方法，而使用 signals，我們只需要正常呼叫它們即可。Angular 現在將註冊一個 <strong>effect</strong> ( <em>consumer</em> )，它將監聽此 signal，並在每次 signal 變更時將範本標記為檢查。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*JvVZ73v8E5zXRzyCOnt3Vg.png" alt="Image 88"></p>
+<p>第一個好處是我們不再需要 async pipe 🎉。</p>
+<p>改進變更偵測的第二個 PR 是這個：</p>
+<p>它解決了一個與 signals 無關但與變更偵測本身相關的問題（我將不會詳細說明）。</p>
+<p>藉由使用它引入的機制，我們得到了第三個 PR，它加入了 <strong>Glo-cal</strong> 變更偵測（全域 + 局部變更偵測）（我的朋友 @<a target="_blank" rel="noopener" href="https://twitter.com/Jean__Meche">Matthieu Riegler</a> 創造的詞語）</p>
+<p>因此，讓我們更好地了解 glo-cal (局部) 變更偵測 👇</p>
+<h2 id="局部變更偵測（目標模式）"><a href="#局部變更偵測（目標模式）" class="headerlink" title="局部變更偵測（目標模式）"></a><strong>局部變更偵測（目標模式）</strong></h2><p>我上面連結的其中一個 PR 在 Angular 中引入了兩個新的旗標。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:522/1*gvQx3FEpysqIW8RpfX91Pw.png" alt="Image 89"></p>
+<p>兩個新的旗標 (RefreshView 和 HAS_CHILD_VIEWS_TO_REFRESH)</p>
+<p>它們如何運作？</p>
+<p>當範本 effect 執行時，Angular 會執行一個名為 <strong>markViewForRefresh</strong> 的函式，該函式會將目前元件的旗標設定為 <strong>RefreshView</strong>，然後呼叫 <strong>markAncestorsForTraversal</strong>，它會將所有祖先標記為 <strong>HAS_CHILD_VIEWS_TO_REFRESH</strong>。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 從 lView 新增 `RefreshView` 旗標，並更新父系的 HAS_CHILD_VIEWS_TO_REFRESH 旗標。</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">markViewForRefresh</span>(<span class="params"><span class="attr">lView</span>: <span class="title class_">LView</span></span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (lView[<span class="variable constant_">FLAGS</span>] &amp; <span class="title class_">LViewFlags</span>.<span class="property">RefreshView</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  lView[<span class="variable constant_">FLAGS</span>] |= <span class="title class_">LViewFlags</span>.<span class="property">RefreshView</span>;</span><br><span class="line">  <span class="keyword">if</span> (<span class="title function_">viewAttachedToChangeDetector</span>(lView)) &#123;</span><br><span class="line">    <span class="title function_">markAncestorsForTraversal</span>(lView);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>以下是它在圖形中的外觀（已更新樹狀結構以展示更多邊緣案例）👇</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*DRDqyuI6pLlELqlA48m5vw.png" alt="Image 90"></p>
+<p>因此，具有 signal 變更的元件會以橘色邊框標記，而父元件現在具有 ⏬ 圖示，表示它們有子視圖需要刷新。</p>
+<blockquote>
+<p>注意：我們仍然依賴 zone.js 來觸發變更偵測。</p>
+</blockquote>
+<p>當 zone.js 啟動時（與之前的原因相同），它將呼叫 <strong>appRef.tick()</strong>，然後我們將會有自上而下的變更偵測，其中包含一些差異和新規則！</p>
+<h2 id="目標模式規則"><a href="#目標模式規則" class="headerlink" title="目標模式規則"></a>目標模式規則</h2><p>NgZone 在 <strong>GlobalMode</strong> 中觸發變更偵測（它將自上而下檢查並刷新所有元件）</p>
+<p>在 <strong>GlobalMode</strong> 中，我們會檢查 <strong>CheckAlways</strong> <em>(沒有設定任何變更偵測策略的正常元件)</em> 和 <strong>Dirty OnPush</strong> 元件</p>
+<p><strong>什麼觸發了 TargetedMode？</strong></p>
+<ul>
+<li>當在 <strong>GlobalMode</strong> 中，我們遇到 <strong>Non-Dirty OnPush</strong> 元件時，我們會切換到 <strong>TargetedMode！</strong></li>
+</ul>
+<p>在 <strong>TargetedMode 中：</strong></p>
+<ul>
+<li>僅當視圖設定了 <strong>RefreshView</strong> 旗標時才刷新視圖</li>
+<li><strong>請勿</strong>刷新 <strong>CheckAlways</strong> 或一般的 <strong>Dirty</strong> 旗標視圖</li>
+<li>如果我們到達具有 <strong>RefreshView</strong> 旗標的視圖，則以 <strong>GlobalMode</strong> 遍歷子元件</li>
+</ul>
+<p>讓我們逐一查看元件。</p>
+<ol>
+<li>根元件是一個正常元件 (<strong>CheckAlways</strong>)，因此我們只在需要時檢查並刷新繫結，然後繼續到其子元件。</li>
+</ol>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*MwEruHykzCIvzX901X4WOw.png" alt="Image 91"></p>
+<p>2. 所有 <strong>CheckAlways</strong> 元件將繼續以與之前相同的方式運作。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*JbNnofQxP7dnAqRpjmro_Q.png" alt="Image 92"></p>
+<p>所有 CheckAlways 元件都會刷新</p>
+<p>3. OnPush 將繼續以相同的方式運作，因此如果未標記為髒，則不會檢查它。</p>
+<p>4. 如果我們檢查另一個是 <strong>OnPush</strong> + <strong>HAS_CHILD_VIEWS_TO_REFRESH</strong> 但不是髒的元件，我們會觸發 <strong>TargetedMode</strong>（檢查上面的規則）</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*XmdIz4ykbWYzPGWeAYfMqg.png" alt="Image 93"></p>
+<p>6. 元件本身不會刷新，讓我們前往子元件</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*OltY0HzHDhj1MDLYEMabuw.png" alt="Image 94"></p>
+<p><strong>TargetedMode</strong> 在 <strong>CheckAlways</strong> 元件上 -&gt; 略過</p>
+<p>7. 然後我們到達一個 <strong>RefreshView</strong> 元件，我們處於 <strong>TargetedMode</strong>，這表示我們刷新繫結。我們也會轉換為 <strong>GlobalMode</strong>，以確保 <strong>CheckAlways</strong> 子元件也正確刷新。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*67Qjlpzdqai93xdGgH8Img.png" alt="Image 95"></p>
+<p>8. 現在我們處於 <strong>GlobalMode</strong>，我們有一個 <strong>CheckAlways</strong> 元件，因此我們只需正常刷新即可）</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*uvzUYErJ3jjenEzC9h2itA.png" alt="Image 96"></p>
+<p>這就是關於新的目標變更偵測的全部內容。</p>
+<p>如果我們查看最終樹狀結構，我們可以看到，當我們到達一個不是髒的 OnPush 元件時，我們略過的元件比以前更多。</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*IAhmVb58R8oaE-IrGid43A.png" alt="Image 97"></p>
+<blockquote>
+<p>目標變更偵測 &#x3D; 沒有陷阱的 OnPush 🔫</p>
+</blockquote>
+<p>您可以在此應用程式中體驗所有這些變更偵測規則，此應用程式由 <a target="_blank" rel="noopener" href="https://github.com/JeanMeche">Mathieu Riegler</a> 🔨 提供</p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*eqLX13lrKYs_4tKk9uk-hQ@2x.png" alt="Image 98"></p>
+<p>了解 Angular 變更偵測</p>
+<h2 id="無-Zone-Angular-—-讓我們從-Angular-中移除-zone-js"><a href="#無-Zone-Angular-—-讓我們從-Angular-中移除-zone-js" class="headerlink" title="無 Zone Angular — 讓我們從 Angular 中移除 zone.js"></a><strong>無 Zone Angular —</strong> 讓我們從 Angular 中移除 zone.js</h2><p>當我們從 Angular 中移除 zone.js 時，我們會留下可以執行的程式碼，但不會更新視圖中的任何內容（zone.js 的引導時間及其在瀏覽器中施加的所有壓力也會被移除！我們還從套件大小中移除了 <code>15kb</code> 😎）。因為沒有任何內容觸發 <strong>appRef.tick()</strong>。</p>
+<p>但是，Angular 有一些 API 可以告知它某些內容已變更。哪些？</p>
+<ul>
+<li>markForCheck（由 async pipe 使用）</li>
+<li>signal 變更</li>
+<li>將視圖標記為髒的事件處理常式</li>
+<li>在使用 **setInput()</li>
+</ul>
+<p>設定以動態方式建立的元件的輸入</p>
+<p>此外，OnPush 元件已經使用以下概念運作：它需要告知 Angular 某些內容已變更。</p>
+<p>因此，我們可以讓 Angular 在知道某些內容已變更時排定 <strong>tick()</strong> 的行程，而不是讓 zone.js 排定 <strong>tick()</strong> 的行程。</p>
+<p>在此 PR（<strong>實驗性</strong>）中，我們可以看見 <strong>markViewDirty</strong> 現在將通知 <strong>changeDetectionScheduler</strong> 某些內容已變更。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">markViewDirty</span>(<span class="params"><span class="attr">lView</span>: <span class="title class_">LView</span></span>): <span class="title class_">LView</span>|<span class="literal">null</span> &#123;</span><br><span class="line">  lView[<span class="variable constant_">ENVIRONMENT</span>].<span class="property">changeDetectionScheduler</span>?.<span class="title function_">notify</span>();</span><br><span class="line">  <span class="comment">// ... 為了簡潔起見，已移除程式碼</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>排程器應該排定 tick() 的行程，正如我們可以在此 zoneless 排程器的其他 <strong>實驗性</strong> 實作中看到的那樣。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Injectable</span>(&#123;<span class="attr">providedIn</span>: <span class="string">&#x27;root&#x27;</span>&#125;)</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">ChangeDetectionSchedulerImpl</span> <span class="keyword">implements</span> <span class="title class_">ChangeDetectionScheduler</span> &#123;</span><br><span class="line">  <span class="keyword">private</span> appRef = <span class="title function_">inject</span>(<span class="title class_">ApplicationRef</span>);</span><br><span class="line">  <span class="keyword">private</span> taskService = <span class="title function_">inject</span>(<span class="title class_">PendingTasks</span>);</span><br><span class="line">  <span class="keyword">private</span> <span class="attr">pendingRenderTaskId</span>: <span class="built_in">number</span>|<span class="literal">null</span> = <span class="literal">null</span>;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">notify</span>(): <span class="built_in">void</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="variable language_">this</span>.<span class="property">pendingRenderTaskId</span> !== <span class="literal">null</span>) <span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">pendingRenderTaskId</span> = <span class="variable language_">this</span>.<span class="property">taskService</span>.<span class="title function_">add</span>();</span><br><span class="line">    <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (!<span class="variable language_">this</span>.<span class="property">appRef</span>.<span class="property">destroyed</span>) &#123;</span><br><span class="line">          <span class="variable language_">this</span>.<span class="property">appRef</span>.<span class="title function_">tick</span>();</span><br><span class="line">        &#125;</span><br><span class="line">      &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">        <span class="keyword">const</span> taskId = <span class="variable language_">this</span>.<span class="property">pendingRenderTaskId</span>!;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">pendingRenderTaskId</span> = <span class="literal">null</span>;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">taskService</span>.<span class="title function_">remove</span>(taskId);</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這是實驗性的，但我們可以看到，基本上，它會合併所有 notify() 呼叫，並僅執行一次（在此程式碼中，每個巨任務（setTimeout）僅執行一次，但也許我們每個微任務（Promise.resolve()）只執行一次）</p>
+<p><strong>我們應該從中了解什麼？</strong></p>
+<p>目前使用 OnPush 變更偵測策略的應用程式在無 Zone Angular 世界中將正常運作。</p>
+<h2 id="無-Zone-Angular-Glo-cal-局部-變更偵測"><a href="#無-Zone-Angular-Glo-cal-局部-變更偵測" class="headerlink" title="無 Zone Angular !&#x3D;&#x3D; Glo-cal (局部) 變更偵測"></a><strong>無 Zone Angular !&#x3D;&#x3D; Glo-cal (局部) 變更偵測</strong></h2><p>無 Zone Angular 與局部變更偵測不同。無 Zone Angular 只是從 Angular 中移除 <strong>zone.js</strong>，並使用 Angular 已擁有的 API 來排定 tick() 的行程。</p>
+<p><strong>真正的局部變更偵測</strong>是一個新功能，它將允許我們僅針對目前使用 OnPush 變更偵測策略的元件子樹（而不是整個元件樹）執行變更偵測。</p>
+<h2 id="Signals-變更偵測（無-OnPush、無-Zone-js、僅限-Signals）"><a href="#Signals-變更偵測（無-OnPush、無-Zone-js、僅限-Signals）" class="headerlink" title="Signals 變更偵測（無 OnPush、無 Zone.js、僅限 Signals）"></a><strong>Signals 變更偵測（無 OnPush、無 Zone.js、僅限 Signals）</strong></h2><p>Signals 變更偵測將帶來的一件事是原生單向資料流（雙向資料繫結，無任何問題）。</p>
+<p>觀看此影片 <strong>Rethinking Reactivity w&#x2F; Alex Rickabaugh | Angular Nation</strong></p>
+<p>雖然使用 OnPush 和無 Zone 的 glo-cal 變更偵測很棒，但僅使用 signal 元件，我們可能會做得更好。</p>
+<p>如果我們不必使用 <strong>OnPush</strong> 呢？或是使用 <strong>HAS_CHILD_VIEWS_TO_REFRESH</strong> 標記父項，並針對整個元件樹執行變更偵測呢？如果我們只能針對已變更的元件內部的視圖執行變更偵測呢？</p>
+<p>在 RFC 中閱讀更多資訊：</p>
+<h2 id="2024-年新年快樂！🎉-Angular-的-Signals-年-🚦！"><a href="#2024-年新年快樂！🎉-Angular-的-Signals-年-🚦！" class="headerlink" title="2024 年新年快樂！🎉 Angular 的 Signals 年 🚦！"></a><strong>2024 年新年快樂！🎉 Angular 的 Signals 年 🚦！</strong></h2><p>今年，Angular 為我們帶來了許多新功能。而且我確信明年會更好。</p>
+<p>請務必查看</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://angular.dev/roadmap">2024 年的 Angular 路線圖</a> 🎉</li>
+<li><a target="_blank" rel="noopener" href="https://angularchristmascalendar.com/">2023 年的 Angular 聖誕節日曆</a></li>
+</ul>
+<h2 id="應有的功勞："><a href="#應有的功勞：" class="headerlink" title="應有的功勞："></a>應有的功勞：</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://twitter.com/synalx">Alex Rickabaugh</a> 回答了我所有關於 Angular 的問題</li>
+<li><a target="_blank" rel="noopener" href="https://twitter.com/AScottAngular">Andrew Scott</a> 至今為止他建立的每個 PR</li>
+<li><a target="_blank" rel="noopener" href="https://twitter.com/Nartc1410">Chau Tran</a> 和 <a target="_blank" rel="noopener" href="https://twitter.com/Jean__Meche">Matthieu Riegler</a> 關於 Angular 內部的討論</li>
+<li><a target="_blank" rel="noopener" href="https://twitter.com/Michael_Hladky">Michael Hladky</a> <a target="_blank" rel="noopener" href="https://twitter.com/hoebbelsB">Julian Jandl</a> <a target="_blank" rel="noopener" href="https://twitter.com/kh_kirill">Kirill Karnaukhov</a> <a target="_blank" rel="noopener" href="https://twitter.com/edbzn">Edouard Bozon</a> <a target="_blank" rel="noopener" href="https://twitter.com/LayZeeDK">Lars Gyrup Brink Nielsen</a> (RxAngular 團隊)</li>
+<li>整個 Angular 團隊所做的精彩工作！</li>
+</ul>
+<h2 id="更擅長現代-Angular-⚡️"><a href="#更擅長現代-Angular-⚡️" class="headerlink" title="更擅長現代 Angular ⚡️"></a>更擅長現代 Angular ⚡️</h2><p>掌握最新的功能，以建構現代應用程式。了解如何使用獨立元件、函式守衛和攔截器、signals、新的 inject 方法等等。</p>
+<p>🔗 <a target="_blank" rel="noopener" href="https://push-based.io/workshop/modern-angular">來自 Push-Based.io 的現代 Angular 工作坊</a></p>
+<p><img src="https://miro.medium.com/v2/resize:fit:700/1*DOmhfx3sEzAXtWrLaibVlg@2x.png" alt="Image 99"></p>
+<p>現代 Angular 工作坊議程</p>
+<h2 id="感謝您的閱讀！"><a href="#感謝您的閱讀！" class="headerlink" title="感謝您的閱讀！"></a>感謝您的閱讀！</h2><p>我經常在推特和部落格上發布關於 <strong>Angular</strong> 的文章（最新消息、signals、影片、podcast、更新、RFC、pull request 等等）。💎</p>
+<p>如果這篇文章對您而言有趣且有用，並且您想了解更多關於 Angular 的資訊，請追蹤我的 <a target="_blank" rel="noopener" href="https://twitter.com/Enea_Jahollari">@Enea_Jahollari</a> 或 <a target="_blank" rel="noopener" href="https://eneajahollari.medium.com/">Medium</a>。📖</p>
+<p>如果您能<a target="_blank" rel="noopener" href="https://ko-fi.com/eneajahollari">買一杯咖啡支持我</a> ☕️，我會很感激。先感謝您 🙌</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

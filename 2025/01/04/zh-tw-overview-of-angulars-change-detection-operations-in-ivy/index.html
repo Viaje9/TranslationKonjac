@@ -1,0 +1,215 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Overview of Angular’s Change Detection operations in Ivy › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/overview-of-angulars-change-detection-operations-in-ivy
+Ivy 中 Angular 的變更偵測操作概述不久前，我寫了一篇文章，詳細探討了 Angular 的變更偵測在變更偵測期間執行的所有操作。隨著 Angular 在 v12 中切換到名為 Ivy 的新渲染引擎，文章中呈現的資訊在某種程度上已經過時。
+在本文中，我想概述 Angular 在新的 Ivy 引擎中變更偵測期間執行的所有操作。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="Overview of Angular’s Change Detection operations in Ivy"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">Overview of Angular’s Change Detection operations in Ivy</h1>
+  
+
+      
+        <time datetime="2025-01-04T08:07:40.000Z">2025-01-04</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/overview-of-angulars-change-detection-operations-in-ivy">https://angular.love/overview-of-angulars-change-detection-operations-in-ivy</a></p>
+<h1 id="Ivy-中-Angular-的變更偵測操作概述"><a href="#Ivy-中-Angular-的變更偵測操作概述" class="headerlink" title="Ivy 中 Angular 的變更偵測操作概述"></a>Ivy 中 Angular 的變更偵測操作概述</h1><p>不久前，我<a target="_blank" rel="noopener" href="https://angular.love/en/everything-you-need-to-know-about-change-detection-in-angular/">寫了一篇文章</a>，詳細探討了 Angular 的變更偵測在變更偵測期間執行的所有操作。隨著 Angular 在 v12 中切換到名為 Ivy 的新渲染引擎，文章中呈現的資訊在某種程度上已經過時。</p>
+<p>在本文中，我想概述 Angular 在新的 Ivy 引擎中變更偵測期間執行的所有操作。</p>
+<span id="more"></span>
+
+<blockquote>
+<p><strong><strong>本文節錄自我的 <a target="_blank" rel="noopener" href="https://angular.love/en/change-detection-big-picture-operations/">Angular 深度探索課程系列</a></strong></strong></p>
+</blockquote>
+<p>當 Angular 為特定元件（視圖）執行變更偵測時，它會執行許多操作。這些操作有時被稱為副作用，就像計算邏輯的副作用一樣：</p>
+<blockquote>
+<p>在電腦科學中，如果操作、函式或表達式修改了其本地環境之外的某些狀態變數值，則稱其具有副作用，也就是說，如果它具有除了將值回傳給操作的呼叫者之外的任何可觀察到的效果。</p>
+</blockquote>
+<p><strong><strong>在 Angular 中，變更偵測的主要副作用是將應用程式狀態呈現到目標平台。大多數時候，目標平台是瀏覽器，應用程式狀態具有元件屬性的形式，而呈現涉及更新 DOM。</strong></strong></p>
+<p>當檢查一個元件時，Angular 會執行一些其他操作。我們可以透過探索 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/02f3d12a0dc2c1b6f5ae06fff019058036fa5edc/packages/core/src/render3/instructions/shared.ts#L357%3E">refreshView</a> 函式來識別它們。一個經過簡化的函式主體，附帶我的解釋性註解如下所示：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">refreshView</span>(<span class="params">tView, lView, templateFn, context</span>) &#123;</span><br><span class="line">  <span class="title function_">enterView</span>(lView);</span><br><span class="line"></span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (templateFn !== <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="comment">// 更新子元件的 input bindings</span></span><br><span class="line">      <span class="comment">// 執行 ngOnInit、ngOnChanges 和 ngDoCheck hooks</span></span><br><span class="line">      <span class="comment">// 更新目前元件上的 DOM</span></span><br><span class="line">      <span class="title function_">executeTemplate</span>(tView, lView, templateFn, <span class="title class_">RenderFlags</span>.<span class="property">Update</span>, context);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 執行 ngOnInit、ngOnChanges 和 ngDoCheck hooks</span></span><br><span class="line">    <span class="comment">// 如果它們尚未從 template 函式執行</span></span><br><span class="line">    <span class="keyword">const</span> preOrderCheckHooks = tView.<span class="property">preOrderCheckHooks</span>;</span><br><span class="line">    <span class="keyword">if</span> (preOrderCheckHooks !== <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="title function_">executeCheckHooks</span>(lView, preOrderCheckHooks, <span class="literal">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 首先將在此 lView 中宣告的 transplant 視圖標記為需要在其插入點進行刷新。</span></span><br><span class="line">    <span class="comment">// 這是為了避免 template 在此 `LView` 中定義，但其宣告出現在插入元件之後的情況。</span></span><br><span class="line">    <span class="title function_">markTransplantedViewsForRefresh</span>(lView);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 刷新透過 ViewContainerRef.createEmbeddedView() 添加的視圖</span></span><br><span class="line">    <span class="title function_">refreshEmbeddedViews</span>(lView);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 內容查詢結果必須在內容 hooks 呼叫之前刷新。</span></span><br><span class="line">    <span class="keyword">if</span> (tView.<span class="property">contentQueries</span> !== <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="title function_">refreshContentQueries</span>(tView, lView);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 執行內容 hooks (AfterContentInit, AfterContentChecked)</span></span><br><span class="line">    <span class="keyword">const</span> contentCheckHooks = tView.<span class="property">contentCheckHooks</span>;</span><br><span class="line">    <span class="keyword">if</span> (contentCheckHooks !== <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="title function_">executeCheckHooks</span>(lView, contentCheckHooks);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 執行透過 @HostBinding() 添加的邏輯</span></span><br><span class="line">    <span class="title function_">processHostBindingOpCodes</span>(tView, lView);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 刷新子元件視圖。</span></span><br><span class="line">    <span class="keyword">const</span> components = tView.<span class="property">components</span>;</span><br><span class="line">    <span class="keyword">if</span> (components !== <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="title function_">refreshChildComponents</span>(lView, components);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 視圖查詢必須在刷新子元件後執行，因為此視圖中的 template 可能會插入到子元件中。</span></span><br><span class="line">    <span class="comment">// 如果視圖查詢在子元件刷新之前執行，則 template 可能尚未插入。</span></span><br><span class="line">    <span class="keyword">const</span> viewQuery = tView.<span class="property">viewQuery</span>;</span><br><span class="line">    <span class="keyword">if</span> (viewQuery !== <span class="literal">null</span>) &#123;</span><br><span class="line">      executeViewQueryFn&lt;T&gt;(<span class="title class_">RenderFlags</span>.<span class="property">Update</span>, viewQuery, context);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 執行視圖 hooks (AfterViewInit, AfterViewChecked)</span></span><br><span class="line">    <span class="keyword">const</span> viewCheckHooks = tView.<span class="property">viewCheckHooks</span>;</span><br><span class="line">    <span class="keyword">if</span> (viewCheckHooks !== <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="title function_">executeCheckHooks</span>(lView, viewCheckHooks);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 在檢查元件後重置 dirty 狀態</span></span><br><span class="line">    <span class="keyword">if</span> (!isInCheckNoChangesPass) &#123;</span><br><span class="line">      lView[<span class="variable constant_">FLAGS</span>] &amp;= ~(<span class="title class_">LViewFlags</span>.<span class="property">Dirty</span> | <span class="title class_">LViewFlags</span>.<span class="property">FirstLViewPass</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 這一個很棘手 :) 需要它自己的章節，我們稍後會探討它</span></span><br><span class="line">    <span class="keyword">if</span> (lView[<span class="variable constant_">FLAGS</span>] &amp; <span class="title class_">LViewFlags</span>.<span class="property">RefreshTransplantedView</span>) &#123;</span><br><span class="line">      lView[<span class="variable constant_">FLAGS</span>] &amp;= ~<span class="title class_">LViewFlags</span>.<span class="property">RefreshTransplantedView</span>;</span><br><span class="line">      <span class="title function_">updateTransplantedViewCount</span>(lView[<span class="variable constant_">PARENT</span>] <span class="keyword">as</span> <span class="title class_">LContainer</span>, -<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">  &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">    <span class="title function_">leaveView</span>();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我們將在「內部渲染引擎」部分詳細了解所有這些操作。</p>
+<p>現在，讓我們瀏覽一下從我上面顯示的函式推斷出的 <strong><strong>在變更偵測期間執行的核心操作</strong></strong>。以下是這些操作的清單，<strong><strong>按照指定的順序排列：</strong></strong></p>
+<ol>
+<li>以更新模式為目前視圖執行 template 函式<br>– 檢查並<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/provider.ts#L154">更新</a>子元件&#x2F;指令實例上的 input 屬性<br>– 如果綁定已變更，則在子元件上執行 hooks <code>ngOnInit</code>、<a target="_blank" rel="noopener" href="https://angular.love/if-you-think-ngdocheck-means-your-component-is-being-checked-read-this-article/"><code>ngDoCheck</code></a> 和 <code>ngOnChanges</code><br>– 如果目前視圖元件實例上的屬性已變更，則<a target="_blank" rel="noopener" href="https://hackernoon.com/the-mechanics-of-dom-updates-in-angular-3b2970d5c03d">更新</a>目前視圖的 DOM 插值</li>
+<li>如果尚未在上一步中執行，則執行 executeCheckHooks<br>– 如果綁定已變更，則在子元件上<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/provider.ts#L202">呼叫</a> <code>OnChanges</code> <a target="_blank" rel="noopener" href="https://angular.love/complete-guide-angular-lifecycle-hooks/">生命週期 hook</a><br>– 在子元件上<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/provider.ts#L202">呼叫</a> <code>ngDoCheck</code>（<code>OnInit</code> 僅在第一次檢查期間呼叫）</li>
+<li>markTransplantedViewsForRefresh<br>– 尋找需要沿 <code>Lview</code> 鏈刷新的 transplant 視圖</li>
+<li>refreshEmbeddedViews<br>– 為透過 ViewContainerRef API 建立的視圖<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/view.ts#L327">執行變更偵測</a>（大多重複此清單中的步驟）</li>
+<li>refreshContentQueries<br>– <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/query.ts#L91">更新</a>子視圖元件實例上的 <code>ContentChildren</code> 查詢清單</li>
+<li>執行 Content CheckHooks<br>– 在子元件實例上<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/provider.ts#L503">呼叫</a> <code>AfterContentChecked</code> 生命週期 hooks（<code>AfterContentInit</code> 僅在第一次檢查期間呼叫）</li>
+<li>processHostBindingOpCodes<br>– 檢查並更新透過元件類別內部的 <code>@HostBinding()</code> 語法添加到主機 DOM 元素上的 DOM 屬性</li>
+<li>refreshChildComponents<br>– 為目前元件 template 中引用的子元件<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/view.ts#L327">執行變更偵測</a>。如果 <code>OnPush</code> 元件不髒，則跳過它們</li>
+<li>executeViewQueryFn<br>– <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/query.ts#L91">更新</a>目前視圖元件實例上的 <code>ViewChildren</code> 查詢清單</li>
+<li>執行 View CheckHooks (AfterViewInit, AfterViewChecked)<br>– 在子元件實例上<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/provider.ts#L503">呼叫</a> <code>AfterViewChecked</code> 生命週期 hooks（<code>AfterViewInit</code> 僅在第一次檢查期間呼叫）</li>
+</ol>
+<h2 id="觀察"><a href="#觀察" class="headerlink" title="觀察"></a>觀察</h2><p>根據上面列出的操作，有幾件事需要強調。</p>
+<p><strong><strong>目前視圖的 Change detection 負責啟動子視圖的 Change detection 。</strong></strong> 這遵循 <code>refreshChildComponents</code> 操作（上面清單中的第 8 項）。對於每個子元件，Angular 執行 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/02f3d12a0dc2c1b6f5ae06fff019058036fa5edc/packages/core/src/render3/instructions/shared.ts#L1687">refreshComponent</a> 函式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">function refreshComponent(hostLView, componentHostIdx) &#123;</span><br><span class="line">  const componentView = getComponentLViewByIndex(componentHostIdx, hostLView);</span><br><span class="line">  // 僅應刷新附加的 CheckAlways 元件</span><br><span class="line">  // 或 OnPush 和 dirty 的元件</span><br><span class="line">  if (viewAttachedToChangeDetector(componentView)) &#123;</span><br><span class="line">    const tView = componentView[TVIEW];</span><br><span class="line">    if (componentView[FLAGS] &amp; (LViewFlags.CheckAlways | LViewFlags.Dirty)) &#123;</span><br><span class="line">      refreshView(tView, componentView, tView.template, componentView[CONTEXT]);</span><br><span class="line">    &#125; else if (componentView[TRANSPLANTED_VIEWS_TO_REFRESH] &gt; 0) &#123;</span><br><span class="line">      // 僅應刷新附加的 CheckAlways 元件</span><br><span class="line">      // 或 OnPush 和 dirty 的元件</span><br><span class="line">      refreshContainsDirtyView(componentView);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>有一個條件定義了是否會檢查元件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">if (viewAttachedToChangeDetector(componentView)) &#123; ... &#125;</span><br><span class="line">if (componentView[FLAGS] &amp; (LViewFlags.CheckAlways | LViewFlags.Dirty)) &#123;...&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主要條件是元件的 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/c14c701775c900ce9ac8781c08fc76da067910c5/packages/core/src/change_detection/change_detector_ref.ts#L63">changeDetectorRef</a> 必須附加到元件樹。如果未附加，則不會檢查元件本身及其子元件或包含的 transplant 視圖。</p>
+<p>如果主要條件成立，則如果元件不是 <code>OnPush</code>，或者如果它是 <code>OnPush</code> 且是 dirty，則會檢查該元件。在 <code>refreshView</code> 函式的末尾有一個邏輯，用於重置 <a target="_blank" rel="noopener" href="https://angular.love/deep-dive-into-the-onpush-change-detection-strategy-in-angular/"><code>OnPush</code> 元件</a>上的 dirty 標誌：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">// 在檢查元件後重置 dirty 狀態</span><br><span class="line">if (!isInCheckNoChangesPass) &#123;</span><br><span class="line">  lView[FLAGS] &amp;= ~(LViewFlags.Dirty | LViewFlags.FirstLViewPass);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最後，如果元件包含 transplant 視圖，也會檢查它們：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">if (componentView[TRANSPLANTED_VIEWS_TO_REFRESH] &gt; 0) &#123;</span><br><span class="line">  // 僅應刷新附加的 CheckAlways 元件或 OnPush 和 dirty 的元件</span><br><span class="line">  refreshContainsDirtyView(componentView);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Template 函式</p>
+<p>Angular 在變更偵測期間首先執行的 <code>executeTemplate</code> 函式的工作是執行元件定義中的 template 函式。此 template 函式是由編譯器為每個元件產生的。對於 <code>A</code> 元件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">@Component(&#123;</span><br><span class="line">  selector: &#x27;a-cmp&#x27;,</span><br><span class="line">  template: `&lt;b-cmp [b]=&quot;1&quot;&gt;&lt;/b-cmp&gt; &#123;&#123;updateTemplate()&#125;&#125;`,</span><br><span class="line">&#125;)</span><br><span class="line">export class A &#123;</span><br><span class="line">  ngDoCheck() &#123;</span><br><span class="line">    console.log(&#x27;A: ngDoCheck&#x27;);</span><br><span class="line">  &#125;</span><br><span class="line">  ngAfterContentChecked() &#123;</span><br><span class="line">    console.log(&#x27;A: ngAfterContentChecked&#x27;);</span><br><span class="line">  &#125;</span><br><span class="line">  ngAfterViewChecked() &#123;</span><br><span class="line">    console.log(&#x27;A: ngAfterViewChecked&#x27;);</span><br><span class="line">  &#125;</span><br><span class="line">  updateTemplate() &#123;</span><br><span class="line">    console.log(&#x27;A: updateTemplate&#x27;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其定義如下所示：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">import &#123;</span><br><span class="line">  ɵɵdefineComponent as defineComponent,</span><br><span class="line">  ɵɵelement as element,</span><br><span class="line">  ɵɵtext as text,</span><br><span class="line">  ɵɵproperty as property,</span><br><span class="line">  ɵɵadvance as advance,</span><br><span class="line">  ɵɵtextInterpolate1 as textInterpolate1</span><br><span class="line">&#125; from &#x27;@angular/core&#x27;;</span><br><span class="line"></span><br><span class="line">export class A &#123;&#125;</span><br><span class="line">export class B &#123;&#125;</span><br><span class="line"></span><br><span class="line">A.ɵfac = function A_Factory(t) &#123; return new (t || A)(); &#125;;</span><br><span class="line">A.ɵcmp = defineComponent(&#123;</span><br><span class="line">    type: A,</span><br><span class="line">    selectors: [[&quot;a-cmp&quot;]],</span><br><span class="line">    decls: 2,</span><br><span class="line">    vars: 2,</span><br><span class="line">    consts: [[3, &quot;b&quot;]],</span><br><span class="line">    template: function A_Template(rf, ctx) &#123;</span><br><span class="line">      if (rf &amp; 1) &#123;</span><br><span class="line">        element(0, &quot;b-cmp&quot;, 0);</span><br><span class="line">        text(1);</span><br><span class="line">      &#125;</span><br><span class="line">      if (rf &amp; 2) &#123;</span><br><span class="line">        property(&quot;b&quot;, 1);</span><br><span class="line">        advance(1);</span><br><span class="line">        textInterpolate1(&quot; &quot;, ctx.updateTemplate(), &quot;&quot;);</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;,</span><br><span class="line">    dependencies: function() &#123; return [B]; &#125;,</span><br><span class="line">    encapsulation: 2</span><br><span class="line">  &#125;</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><em>所有從 import 匯入的函式都使用前綴</em> <code>__ɵɵ__</code> <em>匯出，以將它們識別為私有的。</em></p>
+</blockquote>
+<p>此 template 可以包含<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/40c138c13d17b638908999faafc9eb4cca0202fb/packages/core/src/render3/instructions/all.ts">各種指令</a>。在我們的例子中，它包含在初始化階段執行的創建指令 <code>element</code> 和 <code>text</code>，以及在變更偵測階段執行的 <code>property</code>、<code>advance</code> 和 <code>textInterpolate1</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">template: function A_Template(rf, ctx) &#123;</span><br><span class="line">  if (rf &amp; 1) &#123;</span><br><span class="line">    element(0, &quot;b-cmp&quot;, 0);</span><br><span class="line">    text(1);</span><br><span class="line">  &#125;</span><br><span class="line">  if (rf &amp; 2) &#123;</span><br><span class="line">    property(&quot;b&quot;, 1);</span><br><span class="line">    advance(1);</span><br><span class="line">    textInterpolate1(&quot; &quot;, ctx.updateTemplate(), &quot;&quot;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="生命週期-hooks"><a href="#生命週期-hooks" class="headerlink" title="生命週期 hooks"></a>生命週期 hooks</h3><p>重要的是要了解，<strong><strong>大多數生命週期 hooks 在 Angular 為目前元件執行變更偵測時在子元件上呼叫。</strong></strong> 只有 <code>ngAfterViewChecked</code> hook 的行為略有不同。</p>
+<p>如果您有以下元件階層：<code>A -&gt; B -&gt; C</code>，以下是 hooks 呼叫和綁定更新的順序：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">進入視圖：A</span><br><span class="line">    B: updateBinding</span><br><span class="line">    B: ngOnChanges</span><br><span class="line">    B: ngDoCheck</span><br><span class="line">        A: updateTemplate</span><br><span class="line">    B: ngAfterContentChecked</span><br><span class="line">    進入視圖：B</span><br><span class="line">        С: updateBinding</span><br><span class="line">        C: ngOnChanges</span><br><span class="line">        С: ngDoCheck</span><br><span class="line">            B: updateTemplate</span><br><span class="line">        С: ngAfterContentChecked</span><br><span class="line">        進入視圖：C</span><br><span class="line">            С: updateTemplate</span><br><span class="line">            С: ngAfterViewChecked</span><br><span class="line">    B: ngAfterViewChecked</span><br><span class="line">A: ngAfterViewChecked</span><br></pre></td></tr></table></figure>
+
+<p>目前就這樣。<strong><strong>我會不斷地向課程添加內容</strong></strong>，包括像我上面寫的免費材料。按一下<a target="_blank" rel="noopener" href="https://angular.love/en/change-detection-big-picture-overview">這裡</a>以探索課程或閱讀文章「<a target="_blank" rel="noopener" href="https://medium.com/angular-in-depth/early-bird-option-for-the-most-in-depth-angular-course-29a88a2534cd">深入 Angular 課程的早鳥優惠</a>」，我在其中更詳細地討論了課程內容和目標受眾。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

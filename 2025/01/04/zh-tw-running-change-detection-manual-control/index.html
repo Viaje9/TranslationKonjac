@@ -1,0 +1,243 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>執行變更偵測 – 手動控制 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/running-change-detection-manual-control
+在 Angular 中執行變更偵測 - 應用程式中手動控制偵測手動控制即使 Angular 會自動執行變更偵測，有時你可能需要手動執行變更偵測。如果元件的變更偵測器與元件視圖分離，或更新發生在 Angular zone 之外，就會發生這種情況。
+Angular 有兩種手動觸發變更偵測的方式：
+
+透過 ApplicationRef 呼叫 tick
+透過 ChangeDetectorRef 呼叫 detectChanges">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="執行變更偵測 – 手動控制"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">執行變更偵測 – 手動控制</h1>
+  
+
+      
+        <time datetime="2025-01-04T12:57:03.000Z">2025-01-04</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/running-change-detection-manual-control">https://angular.love/running-change-detection-manual-control</a></p>
+<h1 id="在-Angular-中執行變更偵測-應用程式中手動控制偵測"><a href="#在-Angular-中執行變更偵測-應用程式中手動控制偵測" class="headerlink" title="在 Angular 中執行變更偵測 - 應用程式中手動控制偵測"></a>在 Angular 中執行變更偵測 - 應用程式中手動控制偵測</h1><h2 id="手動控制"><a href="#手動控制" class="headerlink" title="手動控制"></a>手動控制</h2><p>即使 Angular 會自動執行變更偵測，有時你可能需要手動執行變更偵測。<br>如果元件的變更偵測器與元件視圖分離，或更新發生在 Angular zone 之外，就會發生這種情況。</p>
+<p>Angular 有兩種手動觸發變更偵測的方式：</p>
+<ul>
+<li>透過 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/99723fc64ed6ded3635ae5e19648550dc42f1bc1/packages/core/src/application_ref.ts">ApplicationRef</a> 呼叫 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/ff84c7360334792a9a422bd0fa0353e0cf670525/packages/core/src/application_ref.ts#L1001">tick</a></li>
+<li>透過 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/c14c701775c900ce9ac8781c08fc76da067910c5/packages/core/src/change_detection/change_detector_ref.ts#L63">ChangeDetectorRef</a> 呼叫 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/a98fa489fb498273bdfde2fa4598893d1d53582e/packages/core/src/render3/view_ref.ts#L273">detectChanges</a></li>
+</ul>
+<span id="more"></span>
+
+<p><code>tick</code> 方法會從根元件開始為整個應用程式執行變更偵測，<br>而 <code>detectChanges</code> 會執行局部變更偵測，從對應於 <code>ChangeDetectorRef</code> 實例的元件開始，並向下進行。</p>
+<p>讓我們更詳細地探討這兩種方法。</p>
+<h2 id="tick"><a href="#tick" class="headerlink" title="tick"></a>tick</h2><p>當 Angular 從 <code>NgZone</code> 收到關於沒有未完成的微任務的通知時，<br>Angular <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/ff84c7360334792a9a422bd0fa0353e0cf670525/packages/core/src/application_ref.ts#L769">使用此方法</a><br>來執行應用程式範圍的變更偵測：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ApplicationRef</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">_onMicrotaskEmptySubscription</span> = <span class="variable language_">this</span>.<span class="property">_zone</span>.<span class="property">onMicrotaskEmpty</span>.<span class="title function_">subscribe</span>(&#123;</span><br><span class="line">      <span class="attr">next</span>: <span class="function">() =&gt;</span> &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">_zone</span>.<span class="title function_">run</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">          <span class="variable language_">this</span>.<span class="title function_">tick</span>();</span><br><span class="line">        &#125;);</span><br><span class="line">      &#125;,</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但是 <code>tick</code> 方法本身與 zone 或 <code>NgZone</code> 沒有任何關係。<br>它只是為整個應用程式調用變更偵測。</p>
+<p>如果我們<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/ff84c7360334792a9a422bd0fa0353e0cf670525/packages/core/src/application_ref.ts#L1001">深入研究</a>，<br>可以看到它只是簡單地迭代所有頂層（根）視圖，並在每個視圖上觸發 <code>detectChanges</code>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ApplicationRef</span> &#123;</span><br><span class="line">	<span class="title function_">tick</span>(): <span class="built_in">void</span> &#123;</span><br><span class="line">	  <span class="keyword">try</span> &#123;</span><br><span class="line">	    <span class="variable language_">this</span>.<span class="property">_runningTick</span> = <span class="literal">true</span>;</span><br><span class="line">	    <span class="keyword">for</span> (<span class="keyword">let</span> view <span class="keyword">of</span> <span class="variable language_">this</span>.<span class="property">_views</span>) &#123;</span><br><span class="line">	      view.<span class="title function_">detectChanges</span>();</span><br><span class="line">	    &#125;</span><br><span class="line">	    <span class="keyword">if</span> (<span class="keyword">typeof</span> ngDevMode === <span class="string">&#x27;undefined&#x27;</span> || ngDevMode) &#123;</span><br><span class="line">	      <span class="keyword">for</span> (<span class="keyword">let</span> view <span class="keyword">of</span> <span class="variable language_">this</span>.<span class="property">_views</span>) &#123;</span><br><span class="line">	        view.<span class="title function_">checkNoChanges</span>();</span><br><span class="line">	      &#125;</span><br><span class="line">	    &#125;</span><br><span class="line">	  &#125; <span class="keyword">catch</span> (e) &#123; ... &#125; <span class="keyword">finally</span> &#123; ... &#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我們還可以發現，在開發模式下，<code>tick</code> 還會執行 <code>checkNoChanges</code>，<br>這會執行第二次變更偵測週期，以確保沒有偵測到進一步的變更。<br>如果在第二次週期中檢測到其他變更，<br>則表示應用程式中的綁定具有無法在單一變更偵測過程中解決的副作用。<br>在這種情況下，Angular 會拋出錯誤 ExpressionChanged 錯誤，<br>因為 Angular 會強制執行<a target="_blank" rel="noopener" href="https://angular.love/change-detection-big-picture-unidirectional-data-flow/">單向數據流</a>。</p>
+<p>為了查看 <code>tick</code> 方法的實際應用，讓我們使用以下範例：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;i-cmp&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`</span></span><br><span class="line"><span class="string">    &#123;&#123; title &#125;&#125;</span></span><br><span class="line"><span class="string">    &lt;button (click)=&quot;changeName()&quot;&gt;Change name&lt;/button&gt;</span></span><br><span class="line"><span class="string">  `</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">I</span> &#123;</span><br><span class="line">  title = <span class="string">&#x27;Original&#x27;</span>;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">changeName</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">title</span> = <span class="string">&#x27;Updated&#x27;</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這裡我們有一個點擊處理程序，可以更新 <code>title</code> 屬性。沒什麼特別的。<br>現在讓我們像這樣在 <code>main.ts</code> 中禁用 <code>NgZone</code>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">platformBrowserDynamic</span>().<span class="title function_">bootstrapModule</span>(<span class="title class_">AppModule</span>, &#123; <span class="attr">ngZone</span>: <span class="string">&#x27;noop&#x27;</span> &#125;);</span><br></pre></td></tr></table></figure>
+
+<p>當我們運行程式碼時，我們可以發現當我們點擊按鈕時，螢幕不會更新：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/1-94.gif" alt="Image 25: Image alt"></p>
+<p>現在讓我們注入 <code>ApplicationRef</code> 並在處理程序內部觸發 <code>tick</code> 方法：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;i-cmp&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`</span></span><br><span class="line"><span class="string">    &#123;&#123; title &#125;&#125;</span></span><br><span class="line"><span class="string">    &lt;button (click)=&quot;changeName()&quot;&gt;Change name&lt;/button&gt;</span></span><br><span class="line"><span class="string">  `</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">I</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="keyword">private</span> <span class="attr">appRef</span>: <span class="title class_">ApplicationRef</span></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">  title = <span class="string">&#x27;Original&#x27;</span>;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">changeName</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">title</span> = <span class="string">&#x27;Updated&#x27;</span>;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">appRef</span>.<span class="title function_">tick</span>();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>讓我們測試一下：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/2.gif" alt="Image 26: Image alt"></p>
+<p>透過此變更，一切都如預期般運作。</p>
+<p>有時你可能會看到建議使用 <code>NgZone.run</code> 作為全局執行變更偵測的方法。<br>但是，正如 <a target="_blank" rel="noopener" href="https://angular.love/en/running-change-detection-autorun-with-zones/">使用 zones 自動執行</a><br>章節中所解釋的，<code>run</code> 方法只是在 Angular zone 內部評估回呼函式。內部沒有顯式調用 <code>ApplicationRef.tick()</code>。<br>這表示如果當回呼函式執行完成時沒有來自 Angular zone 的事件通知，<br>變更偵測將不會自動發生。</p>
+<h2 id="detectChanges"><a href="#detectChanges" class="headerlink" title="detectChanges"></a>detectChanges</h2><p>此方法在 Angular 為每個元件建立的變更偵測器服務上可用。<br>它用於顯式處理變更偵測及其對元件樹的副作用，<br>從你在其上觸發 <code>detectChanges()</code> 的元件開始。</p>
+<p>這種所謂的<strong>局部變更偵測週期</strong>在許多情況下都很有用，除了在防止自動檢查時手動觸發變更偵測之外。<br>例如，如果你在具有比後代更多的祖先的元件中變更狀態，你可能會<br>通過使用 <code>detectChanges()</code> 獲得效能提升，因為你不會在元件的祖先上不必要地運行變更偵測。<br>另一個案例是分離的變更偵測器，我們將在<br><a target="_blank" rel="noopener" href="https://angular.love/en/running-change-detection-detached-views/">分離視圖</a><br>章節中詳細探討。</p>
+<p>在底層，<code>detectChanges</code> 只是調用<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/5f9c7ceb907be47dff3e203dd837fd6ee9133fcb/packages/core/src/render3/instructions/shared.ts#L354">refreshView</a><br>函式，我們在<br><a target="_blank" rel="noopener" href="https://angular.love/en/change-detection-big-picture-operations/">操作</a><br>章節中簡要探討過：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ViewRef</span> <span class="keyword">implements</span> <span class="title class_">ChangeDetectorRef</span>_interface &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="keyword">public</span> <span class="attr">_lView</span>: <span class="title class_">LView</span>, ...</span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">detectChanges</span>(): <span class="built_in">void</span> &#123;</span><br><span class="line">    <span class="title function_">detectChangesInternal</span>(<span class="variable language_">this</span>.<span class="property">_lView</span>[<span class="variable constant_">TVIEW</span>], <span class="variable language_">this</span>.<span class="property">_lView</span>, <span class="variable language_">this</span>.<span class="property">context</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">detectChangesInternal</span>(<span class="params">tView, lView, context, ...</span>) &#123;</span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="title function_">refreshView</span>(tView, lView, tView.<span class="property">template</span>, context);</span><br><span class="line">  &#125; <span class="keyword">catch</span> (error) &#123;.... &#125; <span class="keyword">finally</span> &#123;... &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>正如你從上面的程式碼片段中看到的，<br>變更偵測器服務基本上是透過<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L79">LView</a><br>實現的元件容器的淺層包裝。<br>當為元件建立 <code>ViewRef</code> 時，與元件關聯的 <code>LView</code> 會被注入到建構子中。<br>當為嵌入式視圖建立 <code>ViewRef</code> 時，它接收的 <code>LView</code> 也描述嵌入式視圖，而不是元件。</p>
+<p>以下是如何想像兩個 <code>A</code> 元件實例的層次結構：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/3.png" alt="Image 27: Image alt"></p>
+<p>對於每個<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L492">視圖類型</a>，Angular 實現了 <code>ViewRef</code> 的不同子類型：<br>在下面的螢幕截圖中，我們可以看到 <code>ViewRef</code> 用於元件視圖，<br><code>EmbeddedViewRef</code> 用於嵌入式視圖，而 <code>InternalViewRef</code> 用於根&#x2F;主機視圖：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/4.png" alt="Image 28: Image alt"></p>
+<h2 id="使用變更偵測器服務"><a href="#使用變更偵測器服務" class="headerlink" title="使用變更偵測器服務"></a>使用變更偵測器服務</h2><p>為了查看 <code>detectChanges</code> 方法的實際應用，讓我們使用之前帶有按鈕的範例。<br>這次，我們將注入 <code>ChangeDetectorRef</code> 而不是 <code>ApplicationRef</code>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">I</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="keyword">private</span> <span class="attr">cdRef</span>: <span class="title class_">ChangeDetectorRef</span></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">  title = <span class="string">&#x27;Original&#x27;</span>;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">changeName</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">title</span> = <span class="string">&#x27;Updated&#x27;</span>;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">cdRef</span>.<span class="title function_">detectChanges</span>();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>讓我們測試一下：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/5.gif" alt="Image 29: Image alt"></p>
+<p>如你所見，一切都如預期般運作。</p>
+<p>這次與使用 <code>ApplicationRef.tick()</code> 的唯一區別在於變更偵測不會為祖先元件運行，<br>特別是對於根 <code>AppComponent</code>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;app-root&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`&lt;i-cmp&gt;&lt;/i-cmp&gt;`</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果我們只是將日誌記錄行為新增至 <code>refreshView</code> 函式，這很容易檢查：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/6.png" alt="Image 30: Image alt"></p>
+<p>我在這裡使用條件斷點而不是日誌點，因為<br>我不希望在視圖類型為根時記錄輸出。我們只對元件視圖感興趣。</p>
+<p>這是使用 <code>detectChanges</code> 時的日誌記錄輸出：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/8.gif" alt="Image 31: Image alt"></p>
+<p>僅檢查 <code>I</code> 元件。</p>
+<p>當我們使用 <code>ApplicationRef</code> 時：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/7.gif" alt="Image 32: Image alt"></p>
+<p>你可以在這裡看到變更偵測被觸發兩次，<br>一次用於常規變更偵測週期，另一次用於 <code>checkNoChanges</code> 流程。</p>
+<h3 id="令人驚訝的-ngDoCheck-行為"><a href="#令人驚訝的-ngDoCheck-行為" class="headerlink" title="令人驚訝的 ngDoCheck 行為"></a>令人驚訝的 ngDoCheck 行為</h3><p>有一個與 <code>detectChanges</code> 相關的意外行為。<br><code>ngDoCheck</code> hook 不會為你觸發 <code>detectChanges</code> 的元件觸發。<br>發生這種情況的原因是生命週期 hook 在檢查其父元件時在子元件上執行，<br>而不是在發出呼叫的當前元件上執行。<br>請參閱關於<a target="_blank" rel="noopener" href="https://angular.love/en/change-detection-big-picture-operations/">操作</a>的章節。</p>
+<p>這樣設計的原因之一是允許從 <code>ngDoCheck</code> hook 手動控制 <code>OnPush</code> 邏輯。<br>如果子元件被定義為 <code>onPush</code>，並且沒有輸入綁定發生變化，你仍然可以從此子元件的<br><a target="_blank" rel="noopener" href="https://angular.love/if-you-think-ngdocheck-means-your-component-is-being-checked-read-this-article/"><code>ngDoCheck</code></a><br>調用 <code>markForCheck()</code>，將該元件標記為髒。</p>
+<h2 id="markForCheck"><a href="#markForCheck" class="headerlink" title="markForCheck"></a>markForCheck</h2><p>變更偵測器服務實現了 <code>markForCheck</code> 方法，該方法非常有用但又有些令人困惑。<br>與 <code>detectChanges()</code> 相反，它不執行變更偵測，<br>而是顯式地將當前元件（視圖）及其祖先標記為已變更（髒）。<br>下次任何祖先執行變更偵測週期時，保證會檢查此標記的元件視圖。<br>這表示如果需要在某些其他操作之前同步更新視圖，<br>你需要使用 <code>detectChanges()</code>，因為呼叫 <code>markForCheck()</code> 可能不會及時更新。</p>
+<p><code>markForCheck</code> 方法主要用於使用 <code>OnPush</code> <a target="_blank" rel="noopener" href="https://angular.love/deep-dive-into-the-onpush-change-detection-strategy-in-angular/">變更偵測策略</a>的元件。<br>當輸入綁定的值發生變化或在元件的模板中觸發了與 UI 相關的事件時，元件通常會被標記為髒（需要重新渲染）。<br>如果沒有發生這兩個觸發器，你需要顯式呼叫此方法以確保下次發生變更偵測時將元件包含在檢查中。</p>
+<p>由於 Angular 僅檢查物件引用，如果引用保持不變，它可能不會偵測到物件屬性輸入變更。<br>一種解決方案是使用不可變物件。<br>另一種解決方案是在 <code>ngDoCheck</code> 方法內執行所需的檢查，並顯式地將視圖標記為髒。</p>
+<p>讓我們看看這個範例。我們有一個父元件 <code>O</code>，它將一個項目新增到 <code>items</code> 陣列，<br>但對陣列的引用保持不變。<br>定義為 <code>OnPush</code> 的子元件 <code>O1</code> 採用此項目陣列作為輸入並呈現它。<br>預設情況下，當 <code>O</code> 新增項目時，Angular 不會偵測到變更，也不會更新視圖。<br>這就是為什麼我們要手動檢查陣列的長度，並在 <code>O1</code> 中使用 <code>markForCheck</code> 來顯式地將元件標記為髒的原因：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;o-cmp&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">&#x27;&lt;o1-cmp [items]=&quot;items&quot;&gt;&lt;/o1-cmp&gt;&#x27;</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">O</span> &#123;</span><br><span class="line">  items = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];</span><br><span class="line"></span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">items</span>.<span class="title function_">push</span>(<span class="number">4</span>);</span><br><span class="line">    &#125;, <span class="number">2000</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;o1-cmp&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">&#x27;&lt;div *ngFor=&quot;let item of items&quot;&gt;&#123;&#123;item&#125;&#125;&lt;/div&gt;&#x27;</span>,</span><br><span class="line">  <span class="attr">changeDetection</span>: <span class="title class_">ChangeDetectionStrategy</span>.<span class="property">OnPush</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">O1</span> &#123;</span><br><span class="line">  <span class="meta">@Input</span>() items = [];</span><br><span class="line">  prevLength = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="keyword">private</span> <span class="attr">cdRef</span>: <span class="title class_">ChangeDetectorRef</span></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">ngDoCheck</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="variable language_">this</span>.<span class="property">items</span>.<span class="property">length</span> !== <span class="variable language_">this</span>.<span class="property">prevLength</span>) &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">prevLength</span> = <span class="variable language_">this</span>.<span class="property">items</span>.<span class="property">length</span>;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">cdRef</span>.<span class="title function_">markForCheck</span>();</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>當呼叫 <code>markForCheck</code> 方法時，<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/5f9c7ceb907be47dff3e203dd837fd6ee9133fcb/packages/core/src/render3/instructions/shared.ts#L1745">在底層</a><br>Angular 只是從當前元件視圖開始向上迭代，<br>並為每個父元件（直到根元件）啟用檢查：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">markViewDirty</span>(<span class="params"><span class="attr">lView</span>: <span class="title class_">LView</span></span>): <span class="title class_">LView</span> | <span class="literal">null</span> &#123;</span><br><span class="line">  <span class="keyword">while</span> (lView) &#123;</span><br><span class="line">    lView[<span class="variable constant_">FLAGS</span>] |= <span class="title class_">LViewFlags</span>.<span class="property">Dirty</span>;</span><br><span class="line">    <span class="keyword">const</span> parent = <span class="title function_">getLViewParent</span>(lView);</span><br><span class="line">    <span class="comment">// Stop traversing up as soon as you find a root view</span></span><br><span class="line">    <span class="comment">// that wasn&#x27;t attached to any container</span></span><br><span class="line">    <span class="keyword">if</span> (<span class="title function_">isRootView</span>(lView) &amp;&amp; !parent) &#123;</span><br><span class="line">      <span class="keyword">return</span> lView;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// continue otherwise</span></span><br><span class="line">    lView = parent!;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最重要的部分是這個賦值：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">lView[<span class="variable constant_">FLAGS</span>] |= <span class="title class_">LViewFlags</span>.<span class="property">Dirty</span>;</span><br></pre></td></tr></table></figure>
+
+<p>程式碼在這裡使用布林值 <code>OR</code> 來設定 <code>LViewFlags.Dirty</code><br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L333">標誌</a>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="keyword">enum</span> <span class="title class_">LViewFlags</span> &#123;</span><br><span class="line">  <span class="comment">/** Whether this view has default change detection strategy (checks always) or onPush */</span></span><br><span class="line">  <span class="title class_">CheckAlways</span> = <span class="number">0b00000010000</span>,</span><br><span class="line"></span><br><span class="line">  <span class="comment">/** Whether or not this view is currently dirty (needing check) */</span></span><br><span class="line">  <span class="title class_">Dirty</span> = <span class="number">0b00000100000</span>,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用布林值 <code>OR</code> 的想法是，如果任何輸入為 <code>1</code>，則結果位元遮罩值將為 <code>1</code>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">1</span> | <span class="number">1</span> = <span class="number">1</span></span><br><span class="line"><span class="number">0</span> | <span class="number">1</span> = <span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>Angular 在 <code>refreshComponent</code> 函式內部檢查此標誌，以確定元件是否需要檢查。<br>該函式本身從 <code>refreshView</code> 執行，而 <code>refreshView</code> 是變更偵測的核心：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">refreshComponent</span>(<span class="params">hostLView, componentHostIdx</span>): <span class="built_in">void</span> &#123;</span><br><span class="line">  ...</span><br><span class="line">  <span class="keyword">const</span> tView = componentView[<span class="variable constant_">TVIEW</span>];</span><br><span class="line">  <span class="keyword">if</span> (componentView[<span class="variable constant_">FLAGS</span>] &amp; (<span class="title class_">LViewFlags</span>.<span class="property">CheckAlways</span> | <span class="title class_">LViewFlags</span>.<span class="property">Dirty</span>)) &#123;</span><br><span class="line">    <span class="title function_">refreshView</span>(tView, componentView, tView.<span class="property">template</span>, componentView[<span class="variable constant_">CONTEXT</span>]);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>當變更影響多個元件，並且你確定變更偵測運行會接著進行時，<br>透過呼叫 <code>markForCheck</code> 而不是 <code>detectChanges</code>，你實際上是<br>透過將未來的運行合併到一個週期來減少變更偵測的呼叫次數。</p>
+<p><code>markForCheck</code> 方法也可能適用於合併和避免在當前檢查週期中間觸發新的變更偵測週期時拋出的錯誤。<br>如果你不確定是否會發生這種情況，請使用 <code>cd.markForCheck()</code>。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

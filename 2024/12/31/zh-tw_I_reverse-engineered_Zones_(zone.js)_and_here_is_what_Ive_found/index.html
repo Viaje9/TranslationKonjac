@@ -1,0 +1,317 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>我對 Zones (zone.js) 進行了反向工程，這是我的發現 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found
+zone.js 反向工程 - zone.js 中有什麼有趣的地方？Zones 是一種新的機制，可以幫助開發人員處理多個邏輯上相關的非同步操作。Zones 的工作方式是將每個非同步操作與一個 zone 關聯起來。開發人員可以利用這種綁定來：
+
+將一些資料與 zone 關聯，類似於其他語言中的執行緒本機儲存，該資料可供 zone 內部的任何非同步操作存取。
+自動追蹤給定 zone 內的未完成非同步操作，以執行清理或渲染或測試斷言步驟
+測量在 zone 中花費的總時間，用於分析或現場分析
+處理 zone 內的所有未捕獲的異常或未處理的 promise 拒絕，而不是讓它們傳播到頂層
+
+網路上大多數文章要么描述過時的 API，要么使用過於簡化的類比來解釋 Zones。在本文中，我將使用最新的 API，並盡可能接近實作來詳細探索重要的 API。我將先描述 API，然後展示非同步任務關聯機制，並繼續介紹開發人員可以使用的攔截鉤子，以執行上面列出的任務。在文章的最後，我簡要說明了 Zones 在底層的工作原理。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="我對 Zones (zone.js) 進行了反向工程，這是我的發現"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">我對 Zones (zone.js) 進行了反向工程，這是我的發現</h1>
+  
+
+      
+        <time datetime="2024-12-31T09:01:14.000Z">2024-12-31</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found">https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found</a></p>
+<h1 id="zone-js-反向工程-zone-js-中有什麼有趣的地方？"><a href="#zone-js-反向工程-zone-js-中有什麼有趣的地方？" class="headerlink" title="zone.js 反向工程 - zone.js 中有什麼有趣的地方？"></a>zone.js 反向工程 - zone.js 中有什麼有趣的地方？</h1><p>Zones 是一種新的機制，可以幫助開發人員處理多個邏輯上相關的非同步操作。Zones 的工作方式是將每個非同步操作與一個 zone 關聯起來。開發人員可以利用這種綁定來：</p>
+<ul>
+<li>將一些資料與 zone 關聯，類似於其他語言中的執行緒本機儲存，該資料可供 zone 內部的任何非同步操作存取。</li>
+<li>自動追蹤給定 zone 內的未完成非同步操作，以執行清理或渲染或測試斷言步驟</li>
+<li>測量在 zone 中花費的總時間，用於分析或現場分析</li>
+<li>處理 zone 內的所有未捕獲的異常或未處理的 promise 拒絕，而不是讓它們傳播到頂層</li>
+</ul>
+<p>網路上大多數文章要么描述過時的 API，要么使用過於簡化的類比來解釋 Zones。在本文中，我將使用最新的 API，並盡可能接近實作來詳細探索重要的 API。我將先描述 API，然後展示非同步任務關聯機制，並繼續介紹開發人員可以使用的攔截鉤子，以執行上面列出的任務。在文章的最後，我簡要說明了 Zones 在底層的工作原理。</p>
+<span id="more"></span>
+
+<p>Zones 目前是 EcmaScript 標準的第 0 階段<a target="_blank" rel="noopener" href="https://github.com/domenic/zones">提案</a>，目前正被 <a target="_blank" rel="noopener" href="https://github.com/nodejs/TSC/issues/340">Node 阻止</a>。Zones 通常被稱為 <code>Zone.js</code>，這是 <a target="_blank" rel="noopener" href="https://github.com/angular/zone.js">github 儲存庫</a> 和 <a target="_blank" rel="noopener" href="https://www.npmjs.com/package/zone.js">npm 套件</a> 的名稱。但是，在本文中，我將使用規格中指定的名稱 <code>Zone</code>。<strong><strong>請注意，本文不是關於 NgZone，而是關於 NgZone 所建立的機制 — Zones (zone.js)。</strong></strong> 透過了解我在本文中介紹的內容，你將能夠建立自己的 NgZone 或了解現有的 NgZone 如何運作。若要深入了解 NgZone，請閱讀<a target="_blank" rel="noopener" href="https://angular.love/en/do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular/">你是否仍然認為在 Angular 中進行變更偵測需要 NgZone (zone.js)？</a></p>
+<h2 id="相關的-Zone-API"><a href="#相關的-Zone-API" class="headerlink" title="相關的 Zone API"></a>相關的 Zone API</h2><p>讓我們首先看看使用 Zones 時最相關的方法。該類別具有以下介面：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Zone</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">parent</span>: <span class="title class_">Zone</span>, <span class="attr">zoneSpec</span>: <span class="title class_">ZoneSpec</span></span>);</span><br><span class="line">  <span class="keyword">static</span> <span class="keyword">get</span> <span class="title function_">current</span>();</span><br><span class="line">  <span class="keyword">get</span> <span class="title function_">name</span>();</span><br><span class="line">  <span class="keyword">get</span> <span class="title function_">parent</span>();</span><br><span class="line"></span><br><span class="line">  <span class="title function_">fork</span>(<span class="attr">zoneSpec</span>: <span class="title class_">ZoneSpec</span>);</span><br><span class="line">  <span class="title function_">run</span>(callback, applyThis, applyArgs, source);</span><br><span class="line">  <span class="title function_">runGuarded</span>(callback, applyThis, applyArgs, source);</span><br><span class="line">  <span class="title function_">wrap</span>(callback, source);</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Zones 有一個 <strong>current zone</strong> 的概念，這至關重要。current zone 是非同步內容，會與所有非同步操作傳播。它表示與目前正在執行的堆疊框架&#x2F;非同步任務關聯的 zone。可以使用靜態 getter <code>Zone.current</code> 存取此 current zone。</p>
+<p>每個 zone 都有一個 <code>name</code>，主要用於工具和除錯目的。它還定義了旨在操作 zone 的方法：</p>
+<ul>
+<li><code>z.run(callback, ...)</code> 在給定的 zone 中同步調用函式。它會在執行 <code>callback</code> 時將 current zone 設定為 <code>z</code>，並在回呼執行完成後將其重設為先前的值。在 zone 中執行回呼通常稱為「進入」zone。</li>
+<li><code>z.runGuarded(callback, ...)</code> 與 <code>run</code> 相同，但會捕獲運行時錯誤並提供一種攔截它們的機制。如果任何父 Zone 都未處理錯誤，則會重新拋出錯誤。</li>
+<li><code>z.wrap(callback)</code> 會產生一個新函式，該函式會在閉包中捕獲 <code>z</code>，並在本質上執行 <code>z.runGuarded(callback)</code>（當執行時）。如果回呼稍後傳遞給 <code>other.run(callback)</code>，它仍然會在 <code>z</code> zone 中執行，而不是 <code>other</code>。該機制在概念上類似於 JavaScript 中 <code>Function.prototype.bind</code> 的工作方式。</li>
+</ul>
+<p>在下一節中，我們將詳細討論 <code>fork</code> 方法。Zone 還有許多方法可以執行、排程和取消任務：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Zone</span> &#123;</span><br><span class="line">  <span class="title function_">runTask</span>(...);</span><br><span class="line">  <span class="title function_">scheduleTask</span>(...);</span><br><span class="line">  <span class="title function_">scheduleMicroTask</span>(...);</span><br><span class="line">  <span class="title function_">scheduleMacroTask</span>(...);</span><br><span class="line">  <span class="title function_">scheduleEventTask</span>(...);</span><br><span class="line">  <span class="title function_">cancelTask</span>(...);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這些是開發人員很少使用的低階方法，因此我不會在本文中詳細討論它們。排程任務是 Zone 的內部操作，對於開發人員而言，它通常意味著簡單地調用某些非同步操作，例如 <code>setTimeout</code>。</p>
+<h2 id="跨呼叫堆疊持續保留-zone"><a href="#跨呼叫堆疊持續保留-zone" class="headerlink" title="跨呼叫堆疊持續保留 zone"></a>跨呼叫堆疊持續保留 zone</h2><p>JavaScript VM 會在它<a target="_blank" rel="noopener" href="https://blog.sessionstack.com/how-does-javascript-actually-work-part-1-b0bacc073cf#6e11">自己的堆疊框架</a>中執行每個函式。因此，如果你有如下程式碼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">c</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="comment">// 捕獲堆疊追蹤</span></span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">new</span> <span class="title class_">Function</span>(<span class="string">&#x27;throw new Error()&#x27;</span>)();</span><br><span class="line">    &#125; <span class="keyword">catch</span> (e) &#123;</span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">log</span>(e.<span class="property">stack</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123; <span class="title function_">c</span>() &#125;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a</span>(<span class="params"></span>) &#123; <span class="title function_">b</span>() &#125;</span><br><span class="line"></span><br><span class="line"><span class="title function_">a</span>();</span><br></pre></td></tr></table></figure>
+
+<p>在 <code>c</code> 函式內部，它具有以下呼叫堆疊：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">at c (index.js:3)</span><br><span class="line">at b (index.js:10)</span><br><span class="line">at a (index.js:14)</span><br><span class="line">at index.js:17</span><br></pre></td></tr></table></figure>
+
+<p>我在 <code>c</code> 函式中用於捕獲堆疊追蹤的方法在 <a target="_blank" rel="noopener" href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/stack">MDN 網站</a> 上有說明。</p>
+<p>呼叫堆疊可以像這樣繪製：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image1-585.png" alt="圖片 23"></p>
+<p>因此，我們的函式呼叫有 3 個堆疊框架，全域內容有一個堆疊。</p>
+<p>在常規的 JavaScript 環境中，函式 <code>c</code> 的堆疊框架與函式 <code>a</code> 的堆疊框架沒有任何關聯。Zone 允許我們做的是將每個堆疊框架與特定的 zone 關聯起來。例如，我們可以將堆疊框架 <code>a</code> 和 <code>c</code> 與同一個 zone 關聯，有效地將它們連結在一起。因此，我們最終會得到以下結果：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image2-497.png" alt="圖片 24"></p>
+<p>我們稍後會看到如何做到這一點。</p>
+<h3 id="使用-zone-fork-建立子-zone"><a href="#使用-zone-fork-建立子-zone" class="headerlink" title="使用 zone.fork 建立子 zone"></a>使用 zone.fork 建立子 zone</h3><p>Zones 最常用的功能之一是使用 <code>fork</code> 方法建立新的 zone。Forking zone 會建立新的子 zone，並將其 <code>parent</code> 設定為用於 forking 的 zone：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> c = z.<span class="title function_">fork</span>(&#123;<span class="attr">name</span>: <span class="string">&#x27;c&#x27;</span>&#125;);</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(c.<span class="property">parent</span> === z); <span class="comment">// true</span></span><br></pre></td></tr></table></figure>
+
+<p><code>fork</code> 方法在底層只是使用類別建立一個新的 zone：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">new</span> <span class="title class_">Zone</span>(targetZone, zoneSpec);</span><br></pre></td></tr></table></figure>
+
+<p>因此，為了完成將 <code>a</code> 和 <code>c</code> 函式與同一個 zone 關聯的任務，我們首先需要建立該 zone。為此，我們將使用我上面展示的 <code>fork</code> 方法：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> zoneAC = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;<span class="attr">name</span>: <span class="string">&#x27;AC&#x27;</span>&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>我們傳遞給 <code>fork</code> 方法的物件稱為 zone 規格 (ZoneSpec)，它具有以下屬性：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">interface</span> <span class="title class_">ZoneSpec</span> &#123;</span><br><span class="line">    <span class="attr">name</span>: <span class="built_in">string</span>;</span><br><span class="line">    <span class="attr">properties</span>?: &#123; [<span class="attr">key</span>: <span class="built_in">string</span>]: <span class="built_in">any</span> &#125;;</span><br><span class="line">    <span class="attr">onFork</span>?: ( ... );</span><br><span class="line">    <span class="attr">onIntercept</span>?: ( ... );</span><br><span class="line">    <span class="attr">onInvoke</span>?: ( ... );</span><br><span class="line">    <span class="attr">onHandleError</span>?: ( ... );</span><br><span class="line">    <span class="attr">onScheduleTask</span>?: ( ... );</span><br><span class="line">    <span class="attr">onInvokeTask</span>?: ( ... );</span><br><span class="line">    <span class="attr">onCancelTask</span>?: ( ... );</span><br><span class="line">    <span class="attr">onHasTask</span>?: ( ... );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>name</code> 定義 zone 的名稱，<code>properties</code> 用於將資料與 zone 關聯。所有其他屬性都是攔截鉤子，允許父 zone 攔截子 zone 的某些操作。重要的是要了解 forking 會建立 zone 階層，並且可以使用鉤子讓父 zone 攔截 Zone 類別中所有操作 zone 的方法。在本文的後面，我們將看到如何使用 <code>properties</code> 在非同步操作之間共用資料，以及使用鉤子來實作任務追蹤。</p>
+<p>讓我們建立一個子 zone：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> zoneB = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;<span class="attr">name</span>: <span class="string">&#x27;B&#x27;</span>&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>現在我們有了兩個 zone，我們可以使用它們在特定的 zone 內執行函式。為此，我們可以使用 <code>zone.run()</code> 方法。</p>
+<h3 id="使用-zone-run-切換-zones"><a href="#使用-zone-run-切換-zones" class="headerlink" title="使用 zone.run 切換 zones"></a>使用 zone.run 切換 zones</h3><p>若要讓特定的堆疊框架與 zone 關聯，我們需要使用 <code>run</code> 方法在該 zone 中執行函式。如你所知，它會在指定的 zone 中同步執行回呼，並在其完成後還原 zone。</p>
+<p>因此，讓我們運用該知識並稍微修改我們的範例：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">c</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// AC</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// B</span></span><br><span class="line">    zoneAC.<span class="title function_">run</span>(c);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// AC</span></span><br><span class="line">    zoneB.<span class="title function_">run</span>(b);</span><br><span class="line">&#125;</span><br><span class="line">zoneAC.<span class="title function_">run</span>(a);</span><br></pre></td></tr></table></figure>
+
+<p>現在每個呼叫堆疊都與 zone 關聯：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image3-456.png" alt="圖片 25"></p>
+<p>如你從上面的程式碼中看到的，我們使用 <code>run</code> 方法執行每個函式，該方法直接指定要使用的 zone。你現在可能想知道，如果我們不使用 <code>run</code> 方法而只是在 zone 內執行函式會發生什麼事？</p>
+<p><strong><strong>重要的是要了解，在函式內部排程的所有函式呼叫和非同步任務都將在與該函式相同的 zone 中執行。</strong></strong></p>
+<p>我們知道 zones 環境始終具有根 zone。因此，如果我們不使用 <code>zone.run</code> 切換 zones，我們預期所有函式都會在 <code>root</code> zone 中執行。讓我們看看是否是這樣：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">c</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// &lt;root&gt;</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// &lt;root&gt;</span></span><br><span class="line">    <span class="title function_">c</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// &lt;root&gt;</span></span><br><span class="line">    <span class="title function_">b</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="title function_">a</span>();</span><br></pre></td></tr></table></figure>
+
+<p>是的，就是這樣。這是圖表：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image4-375.png" alt="圖片 26"></p>
+<p>如果我們只在 <code>a</code> 函式中使用一次 <code>zoneAB.run</code>，則 <code>b</code> 和 <code>c</code> 將在 <code>AB</code> zone 中執行：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> zoneAB = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;<span class="attr">name</span>: <span class="string">&#x27;AB&#x27;</span>&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">c</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// AB</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// AB</span></span><br><span class="line">    <span class="title function_">c</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// &lt;root&gt;</span></span><br><span class="line">    zoneAB.<span class="title function_">run</span>(b);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="title function_">a</span>();</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image5-325.png" alt="圖片 27"></p>
+<p>你可以看到我們在 <code>AB</code> zone 中明確呼叫 <code>b</code> 函式。但是，<code>c</code> 函式也會在此 zone 中執行。</p>
+<h2 id="跨非同步任務持續保留-zone"><a href="#跨非同步任務持續保留-zone" class="headerlink" title="跨非同步任務持續保留 zone"></a>跨非同步任務持續保留 zone</h2><p>JavaScript 開發的獨特特徵之一是非同步程式設計。可能大多數新的 JS 開發人員都會使用 <code>setTimeout</code> 方法來熟悉這種範例，該方法允許延後執行函式。Zone 將 <code>setTimeout</code> 非同步操作稱為任務。具體而言，是巨集任務。另一種類型的任務是微任務，例如 <code>promise.then</code>。瀏覽器在內部使用此術語，<a target="_blank" rel="noopener" href="https://twitter.com/jaffathecake">Jake Archibald</a> 在 <a target="_blank" rel="noopener" href="https://jakearchibald.com/2015/tasks-microtasks-queues-and-schedules/">任務、微任務、佇列和排程</a>中深入解釋了此術語。</p>
+<p>因此，現在讓我們看看 Zone 如何處理非同步任務，例如 <code>setTimeout</code>。為此，我們將只使用我們上面使用的程式碼，但我們將回呼傳遞給 <code>setTimeout</code> 函式，而不是立即呼叫函式 <code>c</code>。因此，此函式將在未來（大約 2 秒後）<strong><strong>在單獨的呼叫堆疊中</strong></strong>執行：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> zoneBC = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;<span class="attr">name</span>: <span class="string">&#x27;BC&#x27;</span>&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">c</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// BC</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// BC</span></span><br><span class="line">    <span class="built_in">setTimeout</span>(c, <span class="number">2000</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>);  <span class="comment">// &lt;root&gt;</span></span><br><span class="line">    zoneBC.<span class="title function_">run</span>(b);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="title function_">a</span>();</span><br></pre></td></tr></table></figure>
+
+<p>我們在上面了解到，如果我們在 zone 內部呼叫一個函式，該函式將在同一個 zone 中執行。此行為也適用於非同步操作。如果我們排程一個非同步任務並指定回呼函式，則此函式將在排程該任務的同一個 zone 中執行。</p>
+<p>因此，如果我們繪製呼叫歷史，我們將有以下結果：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image6-250.png" alt="圖片 28"></p>
+<p>這非常好，但是，此圖表隱藏了重要的實作詳細資訊。在底層，Zone 必須為即將執行的每個任務<strong><strong>還原</strong></strong>正確的 zone。為此，它必須記住應該執行此任務的 zone，並且透過在任務上保留對相關 zone 的引用來做到這一點。然後，此 zone 用於從根 zone 中的處理常式呼叫任務。</p>
+<p>這表示每個非同步任務的呼叫堆疊始終以根 zone 開始，該根 zone 使用與任務相關的資訊來還原正確的 zone，然後呼叫任務。因此，以下是更準確的表示：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image7-227.png" alt="圖片 29"></p>
+<h2 id="跨非同步任務傳播內容"><a href="#跨非同步任務傳播內容" class="headerlink" title="跨非同步任務傳播內容"></a>跨非同步任務傳播內容</h2><p>Zone 具有開發人員可以利用的多種有趣的功能。其中一項功能是內容傳播。它僅表示我們可以將資料附加到 zone，並在該 zone 內部執行的任何任務中存取此資料。</p>
+<p>讓我們使用我們的最後一個範例，並示範如何跨 <code>setTimeout</code> 非同步任務持續保留資料。如你先前了解到的，當 forking 新的 zone 時，我們傳遞 zone 規格物件。此物件可以具有可選的屬性 <code>properties</code>。我們可以使用此屬性將資料與 zone 關聯，如下所示：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> zoneBC = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&#x27;BC&#x27;</span>,</span><br><span class="line">    <span class="attr">properties</span>: &#123;</span><br><span class="line">        <span class="attr">data</span>: <span class="string">&#x27;initial&#x27;</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>然後可以使用 <code>zone.get</code> 方法存取：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">a</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">get</span>(<span class="string">&#x27;data&#x27;</span>)); <span class="comment">// &#x27;initial&#x27;</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">get</span>(<span class="string">&#x27;data&#x27;</span>)); <span class="comment">// &#x27;initial&#x27;</span></span><br><span class="line">    <span class="built_in">setTimeout</span>(a, <span class="number">2000</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">zoneBC.<span class="title function_">run</span>(b);</span><br></pre></td></tr></table></figure>
+
+<p><code>properties</code> 屬性指向的物件是淺層不可變的，這表示你無法新增&#x2F;移除此物件屬性。這主要是因為 Zone 沒有提供任何方法來執行此操作。因此，在上面的範例中，我們無法為 <code>properties.data</code> 設定不同的值。</p>
+<p>但是，我們可以將物件傳遞給 <code>properties.data</code> 而不是基本類型，然後我們將能夠修改資料：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> zoneBC = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&#x27;BC&#x27;</span>,</span><br><span class="line">    <span class="attr">properties</span>: &#123;</span><br><span class="line">        <span class="attr">data</span>: &#123;</span><br><span class="line">            <span class="attr">value</span>: <span class="string">&#x27;initial&#x27;</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">get</span>(<span class="string">&#x27;data&#x27;</span>).<span class="property">value</span>); <span class="comment">// &#x27;updated&#x27;</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">get</span>(<span class="string">&#x27;data&#x27;</span>).<span class="property">value</span>); <span class="comment">// &#x27;initial&#x27;</span></span><br><span class="line">    <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">get</span>(<span class="string">&#x27;data&#x27;</span>).<span class="property">value</span> = <span class="string">&#x27;updated&#x27;</span>;</span><br><span class="line">    <span class="built_in">setTimeout</span>(a, <span class="number">2000</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">zoneBC.<span class="title function_">run</span>(b);</span><br></pre></td></tr></table></figure>
+
+<p>有趣的是，使用 <code>fork</code> 方法建立的子 zone 會繼承父 zone 的屬性：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> parent = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&#x27;parent&#x27;</span>,</span><br><span class="line">    <span class="attr">properties</span>: &#123; <span class="attr">data</span>: <span class="string">&#x27;data from parent&#x27;</span> &#125;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> child = parent.<span class="title function_">fork</span>(&#123;<span class="attr">name</span>: <span class="string">&#x27;child&#x27;</span>&#125;);</span><br><span class="line"></span><br><span class="line">child.<span class="title function_">run</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="property">name</span>); <span class="comment">// &#x27;child&#x27;</span></span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">get</span>(<span class="string">&#x27;data&#x27;</span>)); <span class="comment">// &#x27;data from parent&#x27;</span></span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<h2 id="追蹤未完成的任務"><a href="#追蹤未完成的任務" class="headerlink" title="追蹤未完成的任務"></a>追蹤未完成的任務</h2><p>另一項可能更有趣且有用的功能是追蹤未完成的非同步巨集和微型任務的能力。Zone 會將所有未完成的任務保留在佇列中。若要取得此佇列狀態何時變更的通知，我們可以使用 zone 規格的 <code>onHasTask</code> 鉤子。這是它的簽名：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">onHasTask</span>(delegate, currentZone, targetZone, hasTaskState);</span><br></pre></td></tr></table></figure>
+
+<p>由於父 zone 可以攔截子 zone 事件，Zone 會提供 <code>currentZone</code> 和 <code>targetZone</code> 參數，以區分任務佇列中發生變更的 zone 和攔截事件的 zone。因此，例如，如果你需要確保你正在攔截目前 zone 的事件，只需比較 zone：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 我們只對來自我們 zone 的事件感興趣</span></span><br><span class="line"><span class="keyword">if</span> (currentZone === targetZone) &#123; ... &#125;</span><br></pre></td></tr></table></figure>
+
+<p>傳遞給鉤子的最後一個參數是 <code>hasTaskState</code>，它描述了任務佇列的狀態。這是它的簽名：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">HasTaskState</span> = &#123;</span><br><span class="line">    <span class="attr">microTask</span>: <span class="built_in">boolean</span>; </span><br><span class="line">    <span class="attr">macroTask</span>: <span class="built_in">boolean</span>; </span><br><span class="line">    <span class="attr">eventTask</span>: <span class="built_in">boolean</span>; </span><br><span class="line">    <span class="attr">change</span>: <span class="string">&#x27;microTask&#x27;</span>|<span class="string">&#x27;macroTask&#x27;</span>|<span class="string">&#x27;eventTask&#x27;</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>因此，如果你在 zone 內部呼叫 <code>setTimeout</code>，你將會取得具有下列值的 <code>hasTaskState</code> 物件：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">microTask</span>: <span class="literal">false</span>; </span><br><span class="line">    <span class="attr">macroTask</span>: <span class="literal">true</span>; </span><br><span class="line">    <span class="attr">eventTask</span>: <span class="literal">false</span>; </span><br><span class="line">    <span class="attr">change</span>: <span class="string">&#x27;macroTask&#x27;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這表示佇列中有一個待處理的巨集任務，並且佇列中的變更來自 <code>macrotask</code>。</p>
+<p>因此，讓我們在實作中看到此內容：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> z = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&#x27;z&#x27;</span>,</span><br><span class="line">    <span class="title function_">onHasTask</span>(<span class="params">delegate, current, target, hasTaskState</span>) &#123;</span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">log</span>(hasTaskState.<span class="property">change</span>);          <span class="comment">// &quot;macroTask&quot;</span></span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">log</span>(hasTaskState.<span class="property">macroTask</span>);       <span class="comment">// true</span></span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">JSON</span>.<span class="title function_">stringify</span>(hasTaskState));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a</span>(<span class="params"></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="comment">// 使用</span></span><br><span class="line">    <span class="comment">// change === &quot;macroTask&quot; 同步觸發 `onHasTask` 事件，因為 `setTimeout` 是一個巨集任務</span></span><br><span class="line">    <span class="built_in">setTimeout</span>(a, <span class="number">2000</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">z.<span class="title function_">run</span>(b);</span><br></pre></td></tr></table></figure>
+
+<p>我們會得到以下輸出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">macroTask</span><br><span class="line">true</span><br><span class="line">&#123;</span><br><span class="line">    &quot;microTask&quot;: false,</span><br><span class="line">    &quot;macroTask&quot;: true,</span><br><span class="line">    &quot;eventTask&quot;: false,</span><br><span class="line">    &quot;change&quot;: &quot;macroTask&quot;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>每當兩秒鐘後 timeout 完成執行時，會再次觸發 <code>onHasTask</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">macroTask</span><br><span class="line">false</span><br><span class="line">&#123;</span><br><span class="line">    &quot;microTask&quot;: false,</span><br><span class="line">    &quot;macroTask&quot;: false,</span><br><span class="line">    &quot;eventTask&quot;: false,</span><br><span class="line">    &quot;change&quot;: &quot;macroTask&quot;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但是，有一個注意事項。你只能使用 <code>onHasTask</code> 鉤子來追蹤<strong><strong>整個任務佇列</strong></strong>的 <code>empty/non-empty</code> 狀態。你 ****無法使用它來追蹤個別的任務。**** 如果你執行以下程式碼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">let</span> timer;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> z = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&#x27;z&#x27;</span>,</span><br><span class="line">    <span class="title function_">onHasTask</span>(<span class="params">delegate, current, target, hasTaskState</span>) &#123;</span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="title class_">Date</span>.<span class="title function_">now</span>() - timer);</span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">log</span>(hasTaskState.<span class="property">change</span>);</span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">log</span>(hasTaskState.<span class="property">macroTask</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a1</span>(<span class="params"></span>) &#123;&#125;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a2</span>(<span class="params"></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    timer = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">    <span class="built_in">setTimeout</span>(a1, <span class="number">2000</span>);</span><br><span class="line">    <span class="built_in">setTimeout</span>(a2, <span class="number">4000</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">z.<span class="title function_">run</span>(b);</span><br></pre></td></tr></table></figure>
+
+<p>你將會取得以下輸出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">1</span><br><span class="line">macroTask</span><br><span class="line">true</span><br><span class="line"></span><br><span class="line">4006</span><br><span class="line">macroTask</span><br><span class="line">false</span><br></pre></td></tr></table></figure>
+
+<p>你可以看到，對於在 <code>2</code> 秒內完成的 <code>setTimeout</code> 任務沒有事件。當排程第一個 <code>setTimeout</code> 且任務佇列狀態從 <code>non-empty</code> 變更為 <code>empty</code> 時，<code>onHasTask</code> 鉤子會觸發一次，並且當最後一個 <code>setTimeout</code> 回呼完成時，它會在 <code>4</code> 秒內第二次觸發。</p>
+<p>如果想要追蹤個別任務，你需要使用 <code>onSheduleTask</code> 和 <code>onInvoke</code> 鉤子。</p>
+<h3 id="onSheduleTask-和-onInvokeTask"><a href="#onSheduleTask-和-onInvokeTask" class="headerlink" title="onSheduleTask 和 onInvokeTask"></a>onSheduleTask 和 onInvokeTask</h3><p>Zone 規格定義了兩個可用於追蹤個別任務的鉤子：</p>
+<ul>
+<li>onScheduleTask<br>每當偵測到非同步操作（如 <code>setTimeout</code>）時執行</li>
+<li>onInvokeTask<br>當執行傳遞給非同步操作（如 <code>setTimeout(callback)</code>）的回呼時執行</li>
+</ul>
+<p>以下是如何使用這些鉤子來追蹤個別任務：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">let</span> timer;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> z = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&#x27;z&#x27;</span>,</span><br><span class="line">    <span class="title function_">onScheduleTask</span>(<span class="params">delegate, currentZone, targetZone, task</span>) &#123;</span><br><span class="line">      <span class="keyword">const</span> result = delegate.<span class="title function_">scheduleTask</span>(targetZone, task);</span><br><span class="line">      <span class="keyword">const</span> name = task.<span class="property">callback</span>.<span class="property">name</span>;</span><br><span class="line">      <span class="variable language_">console</span>.<span class="title function_">log</span>(</span><br><span class="line">          <span class="title class_">Date</span>.<span class="title function_">now</span>() - timer, </span><br><span class="line">         <span class="string">`task with callback &#x27;<span class="subst">$&#123;name&#125;</span>&#x27; is added to the task queue`</span></span><br><span class="line">      );</span><br><span class="line">      <span class="keyword">return</span> result;</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="title function_">onInvokeTask</span>(<span class="params">delegate, currentZone, targetZone, task, ...args</span>) &#123;</span><br><span class="line">      <span class="keyword">const</span> result = delegate.<span class="title function_">invokeTask</span>(targetZone, task, ...args);</span><br><span class="line">      <span class="keyword">const</span> name = task.<span class="property">callback</span>.<span class="property">name</span>;</span><br><span class="line">      <span class="variable language_">console</span>.<span class="title function_">log</span>(</span><br><span class="line">        <span class="title class_">Date</span>.<span class="title function_">now</span>() - timer, </span><br><span class="line">       <span class="string">`task with callback &#x27;<span class="subst">$&#123;name&#125;</span>&#x27; is removed from the task queue`</span></span><br><span class="line">     );</span><br><span class="line">     <span class="keyword">return</span> result;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a1</span>(<span class="params"></span>) &#123;&#125;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">a2</span>(<span class="params"></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;</span><br><span class="line">    timer = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">    <span class="built_in">setTimeout</span>(a1, <span class="number">2000</span>);</span><br><span class="line">    <span class="built_in">setTimeout</span>(a2, <span class="number">4000</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">z.<span class="title function_">run</span>(b);</span><br></pre></td></tr></table></figure>
+
+<p>以下是預期的輸出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">1 &quot;task with callback ‘a1’ is added to the task queue&quot;</span><br><span class="line">2 &quot;task with callback ‘a2’ is added to the task queue&quot;</span><br><span class="line">2001 &quot;task with callback ‘a1’ is removed from the task queue&quot;</span><br><span class="line">4003 &quot;task with callback ‘a2’ is removed from the task queue&quot;</span><br></pre></td></tr></table></figure>
+
+<h3 id="使用-onInvoke-攔截-zone「進入」"><a href="#使用-onInvoke-攔截-zone「進入」" class="headerlink" title="使用 onInvoke 攔截 zone「進入」"></a>使用 onInvoke 攔截 zone「進入」</h3><p>可以透過呼叫 <code>z.run()</code> 明確地進入 (切換) zone，也可以透過呼叫任務隱含地進入。在上一節中，我解釋了 <code>onInvokeTask</code> 鉤子，當 Zone 在內部執行與非同步任務關聯的回呼時，可以使用該鉤子來攔截 zone 進入。還有另一個鉤子 <code>onInvoke</code>，你可以使用它來取得何時透過執行 <code>z.run()</code> 進入 zone 的通知。</p>
+<p>以下是如何使用它的範例：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> z = <span class="title class_">Zone</span>.<span class="property">current</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&#x27;z&#x27;</span>,</span><br><span class="line">    <span class="title function_">onInvoke</span>(<span class="params">delegate, current, target, callback, ...args</span>) &#123;</span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">`entering zone &#x27;<span class="subst">$&#123;target.name&#125;</span>&#x27;`</span>);</span><br><span class="line">        <span class="keyword">return</span> delegate.<span class="title function_">invoke</span>(target, callback, ...args);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">b</span>(<span class="params"></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">z.<span class="title function_">run</span>(b);</span><br></pre></td></tr></table></figure>
+
+<p>輸出為：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">entering zone ‘z’</span><br></pre></td></tr></table></figure>
+
+<h2 id="Zone-current-在底層如何工作"><a href="#Zone-current-在底層如何工作" class="headerlink" title="Zone.current 在底層如何工作"></a><code>Zone.current</code> 在底層如何工作</h2><p>目前的 zone 是使用 <a target="_blank" rel="noopener" href="https://github.com/angular/zone.js/blob/b9c0d9c09776bc253f3156ea511c9a1a5c952c31/dist/zone.js#L627">_currentZoneFrame</a> 變數追蹤的，該變數會在 <a target="_blank" rel="noopener" href="https://github.com/angular/zone.js/blob/b9c0d9c09776bc253f3156ea511c9a1a5c952c31/dist/zone.js#L64">此處</a> 捕獲到閉包中，並由 <code>Zone.current</code> getter 回傳。因此，為了切換 zone，只需要更新 <code>__currentZoneFrame</code> 變數。你現在知道，可以透過執行 <code>z.run()</code> 或呼叫任務來切換 zone。</p>
+<p>因此，<a target="_blank" rel="noopener" href="https://github.com/angular/zone.js/blob/b9c0d9c09776bc253f3156ea511c9a1a5c952c31/dist/zone.js#L139">這裡</a> 是 <code>run</code> 方法更新變數的位置：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Zone</span> &#123;</span><br><span class="line">   ...</span><br><span class="line">   <span class="title function_">run</span>(<span class="params">callback, applyThis, applyArgs,source</span>) &#123;</span><br><span class="line">      ...</span><br><span class="line">      _currentZoneFrame = &#123;<span class="attr">parent</span>: _currentZoneFrame, <span class="attr">zone</span>: <span class="variable language_">this</span>&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>而 <code>runTask</code> 會在 <a target="_blank" rel="noopener" href="https://github.com/angular/zone.js/blob/b9c0d9c09776bc253f3156ea511c9a1a5c952c31/dist/zone.js#L185">此處</a> 更新變數：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Zone</span> &#123;</span><br><span class="line">   ...</span><br><span class="line">   <span class="title function_">runTask</span>(<span class="params">task, applyThis, applyArgs</span>) &#123;</span><br><span class="line">      ...</span><br><span class="line">      _currentZoneFrame = &#123; <span class="attr">parent</span>: _currentZoneFrame, <span class="attr">zone</span>: <span class="variable language_">this</span> &#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>runTask</code> 方法是由每個任務都有的 <code>invokeTask</code> 方法呼叫的：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">ZoneTask</span> &#123;</span><br><span class="line">    <span class="title function_">invokeTask</span>(<span class="params"></span>) &#123;</span><br><span class="line">         _numberOfNestedTaskFrames++;</span><br><span class="line">      <span class="keyword">try</span> &#123;</span><br><span class="line">          self.<span class="property">runCount</span>++;</span><br><span class="line">          <span class="keyword">return</span> self.<span class="property">zone</span>.<span class="title function_">runTask</span>(self, <span class="variable language_">this</span>, <span class="variable language_">arguments</span>);</span><br></pre></td></tr></table></figure>
+
+<p>每個任務在建立時都會將其 zone 保存在 <code>zone</code> 屬性中。這正是用於在 <code>invokeTask</code> 中 <code>runTask</code> 的 zone（<code>self</code> 在這裡指的是任務實例）：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">self.<span class="property">zone</span>.<span class="title function_">runTask</span>(self, <span class="variable language_">this</span>, <span class="variable language_">arguments</span>);</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

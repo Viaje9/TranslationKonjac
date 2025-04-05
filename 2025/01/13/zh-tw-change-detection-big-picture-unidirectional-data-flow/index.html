@@ -1,0 +1,181 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>變更偵測大觀 – 單向數據流 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/change-detection-big-picture-unidirectional-data-flow
+在 Angular 中運行變更偵測 - 單向數據流的概念是什麼？單向數據流Angular 強制執行所謂的由上而下的單向數據流。這個慣例的本質是數據從父組件流向子組件，但反之則不然。如果父組件的狀態發生變化，並且有對子組件的輸入綁定，這些變化將在渲染（變更偵測）過程中被推送至子組件。
+組件之間相互通信最常見的方式是透過綁定。如果你在 Angular 中定義了一個父組件 A，如下所示，你會看到它有一個子組件 B，並且父組件 A 通過 obj 輸入綁定將 value 傳遞給子組件 B：
+12345678910111213// 父組件@Component(&amp;#123;    template: `&amp;lt;b-component [prop]=&amp;quot;value&amp;quot;&amp;gt;&amp;lt;/b-component&amp;gt;`&amp;#125;)export class A &amp;#123;    value = &amp;#123;name: &amp;#x27;initial&amp;#x27;&amp;#125;;&amp;#125;// 子組件@Component(&amp;#123; ... &amp;#125;)export class B &amp;#123;    @Input() prop;&amp;#125;">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="變更偵測大觀 – 單向數據流"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">變更偵測大觀 – 單向數據流</h1>
+  
+
+      
+        <time datetime="2025-01-13T13:43:04.000Z">2025-01-13</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/change-detection-big-picture-unidirectional-data-flow">https://angular.love/change-detection-big-picture-unidirectional-data-flow</a></p>
+<h1 id="在-Angular-中運行變更偵測-單向數據流的概念是什麼？"><a href="#在-Angular-中運行變更偵測-單向數據流的概念是什麼？" class="headerlink" title="在 Angular 中運行變更偵測 - 單向數據流的概念是什麼？"></a>在 Angular 中運行變更偵測 - 單向數據流的概念是什麼？</h1><h2 id="單向數據流"><a href="#單向數據流" class="headerlink" title="單向數據流"></a>單向數據流</h2><p>Angular 強制執行所謂的<strong>由上而下的單向數據流</strong>。<br>這個慣例的本質是數據從父組件流向子組件，但反之則不然。<br>如果父組件的狀態發生變化，並且有對子組件的輸入綁定，<br>這些變化將在渲染（變更偵測）過程中被推送至子組件。</p>
+<p>組件之間相互通信最常見的方式是透過綁定。<br>如果你在 Angular 中定義了一個父組件 <code>A</code>，如下所示，<br>你會看到它有一個子組件 <code>B</code>，並且父組件 <code>A</code> 通過 <code>obj</code> 輸入綁定將 <code>value</code> 傳遞給子組件 <code>B</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">// 父組件</span><br><span class="line">@Component(&#123;</span><br><span class="line">    template: `&lt;b-component [prop]=&quot;value&quot;&gt;&lt;/b-component&gt;`</span><br><span class="line">&#125;)</span><br><span class="line">export class A &#123;</span><br><span class="line">    value = &#123;name: &#x27;initial&#x27;&#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 子組件</span><br><span class="line">@Component(&#123; ... &#125;)</span><br><span class="line">export class B &#123;</span><br><span class="line">    @Input() prop;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<span id="more"></span>
+
+<p>理解 <strong>Angular 在變更偵測期間更新綁定</strong>這一點非常重要。<br>因此，當框架為父組件 <code>A</code> 執行變更偵測時，它將更新子組件 <code>B</code> 上的 <code>prop</code> 輸入綁定。<br>這表示變更偵測也總是從根組件開始，為每個組件，每次都由上而下執行。</p>
+<p>如果子組件的狀態發生變化，而父組件以某種方式依賴這些變化，<br>子組件需要明確地將包含更改數據的事件發送回父組件。<br>沒有內建機制可以追蹤子組件中的這些變化，並自動將它們傳播回父組件。</p>
+<p>這就是所謂的單向數據流。應用程式狀態在單次變更偵測後變得穩定。<br>這比循環更有效率且更可預測，如果子組件可以更新其父組件，就會出現循環。<br>我們始終知道視圖中使用的數據來自哪裡，因為它只能來自其父組件。</p>
+<p>為了更好地理解這個限制，想像一下，在當前的變更偵測運行期間，某些已檢查組件的屬性以某種方式被更新了。<br>因此，模板中的表達式將產生與 Angular 作為這些組件檢查的一部分在螢幕上呈現的值不一致的新值。<br>Angular 必須做什麼才能使應用程式狀態和螢幕同步？<br>它當然可以運行另一個變更偵測循環，試圖同步這些。<br>但是，如果在該過程中某些屬性再次被更新了呢？你現在應該看到這個模式了。<br>Angular 實際上可能會陷入變更偵測運行的無限循環中，試圖同步應用程式狀態和副作用的結果，例如螢幕上呈現的內容。<br>因此，總而言之，一旦 Angular 處理完當前組件的綁定，<br>你就不再能更新組件中用於綁定表達式的屬性。</p>
+<h2 id="強制執行單向流"><a href="#強制執行單向流" class="headerlink" title="強制執行單向流"></a>強制執行單向流</h2><p>在開發模式下，Angular 通過在常規變更偵測週期後運行額外的檢查來強制執行單向數據流。<br>此檢查包括比較組件屬性的當前值和模板中的表達式，與 Angular 在前面的變更偵測週期中使用和記住的值。<br>如果任何值不同，框架將拋出臭名昭著的 <a target="_blank" rel="noopener" href="https://angular.love/everything-you-need-to-know-about-the-expressionchangedafterithasbeencheckederror-error/"><code>ExpressionChangedAfterItHasBeenCheckedError</code></a> 錯誤。</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/1-12.png" alt="圖片 10：圖片替代文字"></p>
+<p>可以很容易地觀察到這種效果，方法是從子組件的 <code>AfterViewChecked</code> 鉤子內部更新父組件的狀態。<br>只需確保要更新的祖先組件的屬性導致副作用，即 DOM 更新或子組件輸入綁定更新。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">// 父組件</span><br><span class="line">@Component(&#123;</span><br><span class="line">	selector: &quot;a-cmp&quot;,</span><br><span class="line">	template: `&lt;b-cmp [prop]=&quot;value&quot;&gt;&lt;/b-cmp&gt;`,</span><br><span class="line">&#125;)</span><br><span class="line">export class A &#123;</span><br><span class="line">	value = &#123; name: &quot;initial&quot; &#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 子組件</span><br><span class="line">@Component(&#123;</span><br><span class="line">	selector: &quot;b-cmp&quot;,</span><br><span class="line">	template: `&#123;&#123; prop.name &#125;&#125;`,</span><br><span class="line">&#125;)</span><br><span class="line">export class B &#123;</span><br><span class="line">	@Input() prop;</span><br><span class="line"></span><br><span class="line">	constructor(private parent: A) &#123;&#125;</span><br><span class="line"></span><br><span class="line">	ngAfterViewChecked() &#123;</span><br><span class="line">		this.parent.value.name = &quot;updated&quot;;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在此處查看即時運行示例 <a target="_blank" rel="noopener" href="https://stackblitz.com/edit/angular-ivy-ngmpgu?file=src/app/app.module.ts">這裡</a>。</p>
+<p>在生產模式下，Angular 不會拋出錯誤，但它也不會嘗試穩定應用程式狀態。<br>這通常會導致組件屬性的值與螢幕上呈現的值不一致。<br>在下一次變更偵測期間，不一致可能會得到解決，例如，更新的屬性同步到 DOM。<br>但是，如果在變更偵測檢查完組件後再次更新屬性值，<br>不一致的狀態可能永遠無法解決。當我們回顧變更偵測操作時，我們將花費大量時間來解釋這個錯誤。</p>
+<p>儘管 Angular 中沒有內建機制可以導致變更偵測期間父組件模型更新，<br>但仍然可以通過各種機制意外地導致這種影響：注入父組件引用、共享服務或同步事件廣播。</p>
+<h2 id="子組件與父組件的通信"><a href="#子組件與父組件的通信" class="headerlink" title="子組件與父組件的通信"></a>子組件與父組件的通信</h2><p>在 Angular 中，從子組件到其父組件的通知機制是透過輸出綁定實現的，通常稱為組件事件。<br>它看起來像這樣：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">// 父組件</span><br><span class="line">@Component(&#123;</span><br><span class="line">    template: `</span><br><span class="line">        &lt;h1&gt;Hello &#123;&#123;value.name&#125;&#125;&lt;/h1&gt;</span><br><span class="line">        &lt;a-comp (updateObj)=&quot;value = $event&quot;&gt;&lt;/a-comp&gt;</span><br><span class="line">    `</span><br><span class="line">&#125;)</span><br><span class="line">export class AppComponent &#123;</span><br><span class="line">    value = &#123;name: &#x27;initial&#x27;&#125;;</span><br><span class="line"></span><br><span class="line">    constructor() &#123;</span><br><span class="line">        setTimeout(() =&gt; &#123;</span><br><span class="line">            console.log(this.value); // logs &#123;name: &#x27;updated&#x27;&#125;</span><br><span class="line">        &#125;, 3000);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 子組件</span><br><span class="line">@Component(&#123;...&#125;)</span><br><span class="line">export class AComponent &#123;</span><br><span class="line">    @Output() updateObj = new EventEmitter();</span><br><span class="line"></span><br><span class="line">    constructor() &#123;</span><br><span class="line">        setTimeout(() =&gt; &#123;</span><br><span class="line">            this.updateObj.emit(&#123;name: &#x27;updated&#x27;&#125;);</span><br><span class="line">        &#125;, 2000);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>組件事件最常從附加到 UI 事件、網路事件或計時器的事件處理程式中廣播。<br>由於這些事件在 Angular 運行變更偵測週期<strong>之前</strong>被觸發，<br>因此發出一個將導致父組件更新的事件是完全沒問題的。<br>事實上，這些瀏覽器事件是大多數觸發變更偵測的原因。<br>假設事件處理程式可能會更改應用程式狀態，因此 Angular 需要處理副作用，<br>例如將組件狀態與 DOM 同步。</p>
+<p>但是，如果發出的事件導致父組件的屬性更新，<br>並且這些屬性在變更偵測期間被處理，即模板表達式，<br>則事件必須在 Angular 的變更偵測循環之外發出。<br>否則，這將導致父組件的屬性在變更偵測循環內被更新，從而導致 <code>ExpressionChangedAfterItHasBeenCheckedError</code> 錯誤。</p>
+<p>有時，事件是從變更偵測循環期間執行的處理程式內部同步發出的。<br>只要響應事件的邏輯在 Angular 完成父組件的檢查之前更新父組件的屬性即可。<br>例如，可以從 <a target="_blank" rel="noopener" href="https://angular.io/docs/ts/latest/api/core/index/DoCheck-interface.html">DoCheck</a> 鉤子中執行此操作，<br>該鉤子在處理父組件變更之前在子組件上執行。</p>
+<p>我們將在相應的章節中更仔細地研究這種情況。</p>
+<h2 id="全局狀態管理庫中的單向數據流"><a href="#全局狀態管理庫中的單向數據流" class="headerlink" title="全局狀態管理庫中的單向數據流"></a>全局狀態管理庫中的單向數據流</h2><p>當今大多數 Web 應用程式都使用 NgRx 和 Redux 等狀態管理庫。<br>這些庫實現了與處理和儲存業務相關數據相關的功能。<br>今天，這個服務層被稱為狀態管理。<br>在這個層中運作的庫通常與呈現層（帶有通過 DOM 向使用者顯示應用程式相關數據的組件）沒有密切關聯。<br>因此，區分在變更偵測期間強制執行的單向數據流和用作狀態管理庫的主要架構原則的單向數據流是有意義的。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

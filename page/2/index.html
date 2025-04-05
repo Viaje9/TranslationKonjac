@@ -1,0 +1,493 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>第 2 頁 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper">
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2025/01/04/zh-tw-a-gentle-introduction-into-change-detection-in-angular/">Angular 變更偵測的入門介紹</a></h1>
+  
+
+      
+        <time datetime="2025-01-04T08:33:14.000Z">2025-01-04</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/a-gentle-introduction-into-change-detection-in-angular">https://angular.love/a-gentle-introduction-into-change-detection-in-angular</a></p>
+<h1 id="Angular-變更檢測的入門介紹"><a href="#Angular-變更檢測的入門介紹" class="headerlink" title="Angular 變更檢測的入門介紹"></a>Angular 變更檢測的入門介紹</h1><p>現代的網路應用程式是互動式的。應用程式的狀態可能隨時因按鈕點擊或伺服器返回的請求而改變。當狀態改變時，程式碼需要偵測到該變更並在使用者介面中反映出來。<a target="_blank" rel="noopener" href="https://angular.love/en/what-every-front-end-developer-should-know-about-change-detection-in-angular-and-react/">這是變更偵測機制的主要工作</a>。</p>
+<blockquote>
+<p>如果你偏好觀看而不是閱讀，<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=DsBy9O0c6eo">可以看看我在 AngularConnect 上發表的演講</a>。</p>
+</blockquote>
+<p>過去一年，我寫了<a target="_blank" rel="noopener" href="https://angular.love/en/these-5-articles-will-make-you-an-angular-change-detection-expert/">許多關於 Angular 中 <strong>change detection</strong> 機制的深入文章</a>。它們提供了詳細的解釋並涵蓋了許多內部細節。但是，它們也需要花費大量時間才能仔細閱讀。對於那些沒有時間但仍然好奇的你來說：這篇文章提供了對變更偵測機制的「較輕鬆」的解釋。它將讓你對其組成部分和機制有一個高階的概述：用於表示元件的內部資料結構、綁定的作用以及作為該過程一部分執行的操作。我也會提到 zones，並確切地展示此功能如何在 Angular 中啟用自動變更偵測。</p>
+<p>當事情出錯時，了解變更偵測的內部運作原理將有助於你更有效率地除錯錯誤，例如 <a target="_blank" rel="noopener" href="https://angular.love/everything-you-need-to-know-about-the-expressionchangedafterithasbeencheckederror-error/"><code>ExpressionChangedAfterItHasBeenCheckedError</code></a>，並避免<a target="_blank" rel="noopener" href="https://angular.love/if-you-think-ngdocheck-means-your-component-is-being-checked-read-this-article/">一些常見的混淆</a>。在這篇文章中，我將演示幾個導致錯誤的設定，並使用它們來解釋變更偵測的內部運作原理。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2025/01/04/zh-tw-a-gentle-introduction-into-change-detection-in-angular/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2025/01/04/zh-tw-overview-of-angulars-change-detection-operations-in-ivy/">Overview of Angular’s Change Detection operations in Ivy</a></h1>
+  
+
+      
+        <time datetime="2025-01-04T08:07:40.000Z">2025-01-04</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/overview-of-angulars-change-detection-operations-in-ivy">https://angular.love/overview-of-angulars-change-detection-operations-in-ivy</a></p>
+<h1 id="Ivy-中-Angular-的變更偵測操作概述"><a href="#Ivy-中-Angular-的變更偵測操作概述" class="headerlink" title="Ivy 中 Angular 的變更偵測操作概述"></a>Ivy 中 Angular 的變更偵測操作概述</h1><p>不久前，我<a target="_blank" rel="noopener" href="https://angular.love/en/everything-you-need-to-know-about-change-detection-in-angular/">寫了一篇文章</a>，詳細探討了 Angular 的變更偵測在變更偵測期間執行的所有操作。隨著 Angular 在 v12 中切換到名為 Ivy 的新渲染引擎，文章中呈現的資訊在某種程度上已經過時。</p>
+<p>在本文中，我想概述 Angular 在新的 Ivy 引擎中變更偵測期間執行的所有操作。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2025/01/04/zh-tw-overview-of-angulars-change-detection-operations-in-ivy/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2025/01/04/zh-tw_everything-you-need-to-know-about-change-detection-in-angular/">關於 Angular 中變更偵測你需要知道的一切</a></h1>
+  
+
+      
+        <time datetime="2025-01-04T07:50:14.000Z">2025-01-04</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/everything-you-need-to-know-about-change-detection-in-angular">https://angular.love/everything-you-need-to-know-about-change-detection-in-angular</a></p>
+<h1 id="關於-Angular-中-change-detection-你需要知道的一切"><a href="#關於-Angular-中-change-detection-你需要知道的一切" class="headerlink" title="關於 Angular 中 change detection 你需要知道的一切"></a>關於 Angular 中 change detection 你需要知道的一切</h1><p>如果你和我一樣，想要全面了解 Angular 中的變更偵測機制，你必須探索原始碼，因為網路上沒有太多可用的資訊。大多數文章都提到每個 component 都有自己的變更偵測器，負責檢查 component，但它們並未深入探討，大多只關注 immutables 和變更偵測策略的使用案例。本文為你提供了解 <strong>為什麼</strong> 使用 immutables 的案例有效，以及變更偵測策略 <strong>如何</strong> 影響檢查所需的資訊。此外，你從本文學到的內容將使你能夠自行提出各種效能優化的情境。</p>
+<blockquote>
+<p>本文相當深入。如需了解變更偵測的簡介，請參閱 <a target="_blank" rel="noopener" href="https://angular.love/en/a-gentle-introduction-into-change-detection-in-angular/">Angular 中變更偵測的溫和介紹</a></p>
+</blockquote>
+<p>本文包含兩個部分。第一部分技術性較強，包含許多指向原始碼的連結。它詳細解釋了變更偵測機制在底層的運作方式。其內容基於最新的 Angular 版本 — 4.0.1。此版本中變更偵測機制的底層實作方式與之前的 2.4.1 不同。如有興趣，你可以閱讀 <a target="_blank" rel="noopener" href="http://stackoverflow.com/a/42807309/2545680">此 stackoverflow 回答</a> 中關於它在之前的版本是如何運作的資訊。</p>
+<p>第二部分展示了如何在應用程式中使用變更偵測，其內容適用於較早的 2.4.1 和最新的 4.0.1 版本的 Angular，因為公共 API 沒有改變。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2025/01/04/zh-tw_everything-you-need-to-know-about-change-detection-in-angular/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2025/01/03/zh-tw_do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular/">Do you still think that NgZone (zone.js) is required for change detection in Angular?</a></h1>
+  
+
+      
+        <time datetime="2025-01-03T02:57:14.000Z">2025-01-03</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular">https://angular.love/do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular</a></p>
+<h1 id="Angular-中的變更偵測是否仍然需要-NgZone-zone-js-？"><a href="#Angular-中的變更偵測是否仍然需要-NgZone-zone-js-？" class="headerlink" title="Angular 中的變更偵測是否仍然需要 NgZone (zone.js)？"></a>Angular 中的變更偵測是否仍然需要 NgZone (zone.js)？</h1><p>我看到的大部分文章都強烈地將 <code>Zone</code> (<code>zone.js</code>) 和 <code>NgZone</code> 與 Angular 中的變更偵測聯繫起來。雖然它們確實相關，但嚴格來說它們並不是一個整體的一部分。是的，<code>Zone</code> 和 <code>NgZone</code> 用於自動觸發非同步操作所導致的變更偵測。但是，由於變更偵測是一個獨立的機制，它可以成功地在沒有 <code>Zone</code> 和 <code>NgZone</code> 的情況下工作。在第一章中，我將展示如何在沒有 <code>zone.js</code> 的情況下使用 Angular。本文的第二部分解釋了 Angular 和 zone.js 如何透過 <code>NgZone</code> 相互作用。最後，我還會說明為什麼自動變更偵測有時在使用 <a target="_blank" rel="noopener" href="https://developers.google.com/api-client-library/">Google API Client Library</a> (gapi) 等第三方函式庫時不起作用。</p>
+<p>我寫過許多關於 Angular 中變更偵測的深入文章，而這篇文章完善了這個概念。如果你正在尋找關於變更偵測如何運作的全面概述，我建議你閱讀所有文章，從這篇開始 <a target="_blank" rel="noopener" href="https://angular.love/these-5-articles-will-make-you-an-angular-change-detection-expert/">這 5 篇文章將讓你成為 Angular 變更偵測專家</a>。****請注意，本文不是關於 Zones (zone.js)，而是關於 Angular 如何在 NgZone 的實作中使用 Zones 以及它與變更偵測機制的關係。****要了解更多關於 Zones 的資訊，請閱讀 <a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">我對 Zones (zone.js) 進行了逆向工程，這是我發現的</a>。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2025/01/03/zh-tw_do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2024/12/31/zh-tw_Change_Detection_Big_Picture-Overview/">變更偵測大觀 – 總覽</a></h1>
+  
+
+      
+        <time datetime="2024-12-31T09:08:14.000Z">2024-12-31</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/change-detection-big-picture-overview">https://angular.love/change-detection-big-picture-overview</a></p>
+<h1 id="變更偵測概觀-總覽"><a href="#變更偵測概觀-總覽" class="headerlink" title="變更偵測概觀 - 總覽"></a>變更偵測概觀 - 總覽</h1><h2 id="概觀"><a href="#概觀" class="headerlink" title="概觀"></a>概觀</h2><p>在任何應用程式中，更新螢幕的過程都需要程式的內部狀態，並將其投影到使用者可以在螢幕上看到的東西。在網頁開發中，我們會使用諸如物件和陣列之類的資料結構，並最終以影像、按鈕和其他視覺元素的形式呈現該資料的 DOM 表示法。框架負責同步應用程式的內部狀態和底層平台。但是，它們不僅減輕了我們的負擔，而且還非常有效地進行狀態追蹤和 DOM 更新。</p>
+<p>這種同步機制稱為渲染。<br>它有不同的名稱 – Angular 中的變更偵測或 React 中的協調 – 但它執行的核心操作<br>在不同的實作中是相似的。<br>變更偵測是架構中最重要的部分之一，因為<br>它負責更新負責可見部分的平台模型 (DOM)。<br>它也是顯著影響應用程式效能的領域。<br>接下來，我將交替使用渲染和變更偵測這兩個術語。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2024/12/31/zh-tw_Change_Detection_Big_Picture-Overview/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2024/12/31/zh-tw_I_reverse-engineered_Zones_(zone.js)_and_here_is_what_Ive_found/">我對 Zones (zone.js) 進行了反向工程，這是我的發現</a></h1>
+  
+
+      
+        <time datetime="2024-12-31T09:01:14.000Z">2024-12-31</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found">https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found</a></p>
+<h1 id="zone-js-反向工程-zone-js-中有什麼有趣的地方？"><a href="#zone-js-反向工程-zone-js-中有什麼有趣的地方？" class="headerlink" title="zone.js 反向工程 - zone.js 中有什麼有趣的地方？"></a>zone.js 反向工程 - zone.js 中有什麼有趣的地方？</h1><p>Zones 是一種新的機制，可以幫助開發人員處理多個邏輯上相關的非同步操作。Zones 的工作方式是將每個非同步操作與一個 zone 關聯起來。開發人員可以利用這種綁定來：</p>
+<ul>
+<li>將一些資料與 zone 關聯，類似於其他語言中的執行緒本機儲存，該資料可供 zone 內部的任何非同步操作存取。</li>
+<li>自動追蹤給定 zone 內的未完成非同步操作，以執行清理或渲染或測試斷言步驟</li>
+<li>測量在 zone 中花費的總時間，用於分析或現場分析</li>
+<li>處理 zone 內的所有未捕獲的異常或未處理的 promise 拒絕，而不是讓它們傳播到頂層</li>
+</ul>
+<p>網路上大多數文章要么描述過時的 API，要么使用過於簡化的類比來解釋 Zones。在本文中，我將使用最新的 API，並盡可能接近實作來詳細探索重要的 API。我將先描述 API，然後展示非同步任務關聯機制，並繼續介紹開發人員可以使用的攔截鉤子，以執行上面列出的任務。在文章的最後，我簡要說明了 Zones 在底層的工作原理。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2024/12/31/zh-tw_I_reverse-engineered_Zones_(zone.js)_and_here_is_what_Ive_found/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2024/12/31/zh-tw_Running_change_detection-Autorun_with_zones/">Running change detection - Autorun with zones</a></h1>
+  
+
+      
+        <time datetime="2024-12-31T03:22:14.000Z">2024-12-31</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/running-change-detection-autorun-with-zones">https://angular.love/running-change-detection-autorun-with-zones</a></p>
+<h1 id="執行-Change-Detection-–-使用-Zones-自動執行"><a href="#執行-Change-Detection-–-使用-Zones-自動執行" class="headerlink" title="執行 Change Detection – 使用 Zones 自動執行"></a>執行 Change Detection – 使用 Zones 自動執行</h1><h2 id="使用-zones-自動執行"><a href="#使用-zones-自動執行" class="headerlink" title="使用 zones 自動執行"></a>使用 zones 自動執行</h2><p>Angular 中的變更偵測（渲染）通常是因瀏覽器中的非同步事件而完全自動觸發的。<br>這是透過使用 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/297d865e9e1ca0ffa183988c16429f16bc2ccbd7/packages/zone.js">zone.js</a> 函式庫實作的 zones 來實現的。<br>一般來說，zones 提供了一種機制來攔截非同步操作的排程和調用。<br>攔截器邏輯可以在任務之前或之後執行額外的程式碼，並通知相關方有關該事件。<br>這些規則在建立每個 zone 時會個別定義。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2024/12/31/zh-tw_Running_change_detection-Autorun_with_zones/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2024/12/24/zh-tw-a-change-detection-zone-js-zoneless-local-change-detection-and-signals-story-934/">一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚</a></h1>
+  
+
+      
+        <time datetime="2024-12-24T10:40:14.000Z">2024-12-24</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://itnext.io/a-change-detection-zone-js-zoneless-local-change-detection-and-signals-story-9344079c3b9d">https://itnext.io/a-change-detection-zone-js-zoneless-local-change-detection-and-signals-story-9344079c3b9d</a></p>
+<h1 id="一個關於變更偵測、zone-js、無-Zone、局部變更偵測和-Signals-的故事-📚"><a href="#一個關於變更偵測、zone-js、無-Zone、局部變更偵測和-Signals-的故事-📚" class="headerlink" title="一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚"></a>一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚</h1><p><img src="https://miro.medium.com/v2/resize:fit:700/1*N0FoEeuERFDvvkuOzhgOJA.png" alt="Image 71"></p>
+<p>Photo by <a target="_blank" rel="noopener" href="https://unsplash.com/@vork?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Mark Boss</a> on <a target="_blank" rel="noopener" href="https://unsplash.com/photos/traffic-light-gHkKgHX0fbE?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Unsplash</a></p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2024/12/24/zh-tw-a-change-detection-zone-js-zoneless-local-change-detection-and-signals-story-934/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2024/12/24/zh-tw_Signals_in_Angular_deep_dive_for_busy_developers/">Signals in Angular：deep dive for busy developers</a></h1>
+  
+
+      
+        <time datetime="2024-12-24T10:40:14.000Z">2024-12-24</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/signals-in-angular-deep-dive-for-busy-developers">https://angular.love/signals-in-angular-deep-dive-for-busy-developers</a></p>
+<h1 id="Angular-中的-Signals：忙碌開發者的深度解析"><a href="#Angular-中的-Signals：忙碌開發者的深度解析" class="headerlink" title="Angular 中的 Signals：忙碌開發者的深度解析"></a>Angular 中的 Signals：忙碌開發者的深度解析</h1><p>建構複雜的使用者介面是一項艱鉅的任務。在現代的 web 應用程式中，UI 的 state 很少由簡單的獨立值組成。它更像是一個複雜的 computed state，取決於其他值或 computed state 的複雜層次結構。管理這個 state 涉及大量的工作：開發人員必須儲存、計算、使無效和同步這些值。</p>
+<p>多年來，web 開發中引入了各種框架和基本要素來簡化這項任務。它們大多數的一個核心主題是 reactive programming，它提供了管理應用程式 state 的基礎架構，讓開發人員可以專注於商業邏輯，而不是重複的 state 管理任務。</p>
+<p>最新加入的是 signals，一種 “reactive” 的基本要素，它代表一個動態變化值，並可以在值發生變化時通知感興趣的 consumers。這些 consumers 反過來可以運行重新計算或各種 side-effect，例如建立&#x2F;銷毀 components、運行網路請求、更新 DOM 等。</p>
+<p>我們可以在不同的框架中找到 signals 的不同實現。現在甚至有標準化 signals 的努力：</p>
+<p>… 這項努力的重點是使 JavaScript 生態系統保持一致。一些框架作者正在這裡合作開發一個通用模型，該模型可以支持他們的核心 reactivity。目前的草案基於來自 Angular、Bubble、Ember、FAST、MobX、Preact、Qwik、RxJS、Solid、Starbeam、Svelte、Vue、Wiz 等作者&#x2F;維護者的設計輸入 …</p>
+<p>Angular 中 signals 的實現與提案中提供的實現非常相似，因此我可能會在本文中在這兩者之間進行交叉引用。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2024/12/24/zh-tw_Signals_in_Angular_deep_dive_for_busy_developers/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+  <article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title"><a href="/TranslationKonjac/2024/12/24/zh-tw_The_Latest_in_Angular_Change_Detection-All_You_Need_to_Know/">Angular 最新的變更偵測 – 所有你需要知道的</a></h1>
+  
+
+      
+        <time datetime="2024-12-24T10:40:14.000Z">2024-12-24</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/the-latest-in-angular-change-detection-zoneless-signals">https://angular.love/the-latest-in-angular-change-detection-zoneless-signals</a></p>
+<h1 id="Angular-最新的-Change-Detection—所有你需要知道的"><a href="#Angular-最新的-Change-Detection—所有你需要知道的" class="headerlink" title="Angular 最新的 Change Detection—所有你需要知道的"></a>Angular 最新的 Change Detection—所有你需要知道的</h1><p> Change Detection 一直是一個熱門話題，這並不奇怪  它是任何框架的核心概念之一。不管他如何設計或實現， Change Detection 始終是框架的基本任務之一，同時也是開發者選擇這些框架的主要原因之一。</p>
+<p>在 Angular 中，這個話題特別具有爭議性，主要是因為由 <strong>Zone.js</strong> 支援的 Change Detection 機制具有某種「魔法般」的性質。最近這部分有重大更新，特別是新增了 <strong>signals</strong>（信號），並提供了 <strong>不使用 Zone.js</strong> 的選項。我們一起來探索這些變化是如何展開的。</p>
+      
+    </div>
+      
+        
+        <footer>
+          <div class="alignleft">
+            <a href="/TranslationKonjac/2024/12/24/zh-tw_The_Latest_in_Angular_Change_Detection-All_You_Need_to_Know/#more" class="more-link">Read More ›</a>
+          </div>
+        
+        
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+
+
+
+
+<nav id="pagination">
+  
+    <a href="/TranslationKonjac/" class="alignleft prev">上一頁</a>
+  
+  
+  <div class="clearfix"></div>
+</nav></div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

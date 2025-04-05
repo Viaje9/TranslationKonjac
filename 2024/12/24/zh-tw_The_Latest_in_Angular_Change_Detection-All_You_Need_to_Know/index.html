@@ -1,0 +1,261 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Angular 最新的變更偵測 – 所有你需要知道的 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/the-latest-in-angular-change-detection-zoneless-signals
+Angular 最新的 Change Detection—所有你需要知道的 Change Detection 一直是一個熱門話題，這並不奇怪  它是任何框架的核心概念之一。不管他如何設計或實現， Change Detection 始終是框架的基本任務之一，同時也是開發者選擇這些框架的主要原因之一。
+在 Angular 中，這個話題特別具有爭議性，主要是因為由 Zone.js 支援的 Change Detection 機制具有某種「魔法般」的性質。最近這部分有重大更新，特別是新增了 signals（信號），並提供了 不使用 Zone.js 的選項。我們一起來探索這些變化是如何展開的。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="Angular 最新的變更偵測 – 所有你需要知道的"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">Angular 最新的變更偵測 – 所有你需要知道的</h1>
+  
+
+      
+        <time datetime="2024-12-24T10:40:14.000Z">2024-12-24</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/the-latest-in-angular-change-detection-zoneless-signals">https://angular.love/the-latest-in-angular-change-detection-zoneless-signals</a></p>
+<h1 id="Angular-最新的-Change-Detection—所有你需要知道的"><a href="#Angular-最新的-Change-Detection—所有你需要知道的" class="headerlink" title="Angular 最新的 Change Detection—所有你需要知道的"></a>Angular 最新的 Change Detection—所有你需要知道的</h1><p> Change Detection 一直是一個熱門話題，這並不奇怪  它是任何框架的核心概念之一。不管他如何設計或實現， Change Detection 始終是框架的基本任務之一，同時也是開發者選擇這些框架的主要原因之一。</p>
+<p>在 Angular 中，這個話題特別具有爭議性，主要是因為由 <strong>Zone.js</strong> 支援的 Change Detection 機制具有某種「魔法般」的性質。最近這部分有重大更新，特別是新增了 <strong>signals</strong>（信號），並提供了 <strong>不使用 Zone.js</strong> 的選項。我們一起來探索這些變化是如何展開的。</p>
+<span id="more"></span>
+
+<h2 id="（不）快速的回顧"><a href="#（不）快速的回顧" class="headerlink" title="（不）快速的回顧"></a>（不）快速的回顧</h2><p>在深入介紹新變化之前，我們需要對已存在多年的 Change Detection 機制有基本的了解。這個基礎將幫助我們更好地掌握新概念，因為它們是在現有機制之上構建的，而不是引入完全獨立或全新的東西（是一種演進，而非革命）。如果你對引入 <strong>signals</strong> 和 <strong>Zoneless</strong>（無 Zone.js）的 Change Detection 已經非常熟悉，可以考慮跳過本章。</p>
+<p>當談到 Change Detection 時，我認為將其執行劃分為「<strong>When</strong>」與「<strong>How</strong>」兩個方面是非常有幫助的。理解這兩個部分對於掌握 Angular 的整體 Change Detection 流程至關重要。</p>
+<h3 id="When？"><a href="#When？" class="headerlink" title="When？"></a>When？</h3><p>「<strong>When</strong>」的部分與 Change Detection 的排程有關。它涉及 Change Detection 何時發生以及導致其執行的因素。</p>
+<p>除了手動觸發 Change Detection 的選項外，主要由 <strong>scheduler</strong>（調度器）負責為我們處理這個問題。自 Angular 問世以來， Change Detection 的調度器一直基於 <em><strong>Zone.js</strong></em>。該庫通過<a target="_blank" rel="noopener" href="https://github.com/angular/zone.js/blob/master/STANDARD-APIS.md">補丁瀏覽器 API</a>並攔截任務執行來跟踪各種操作。</p>
+<p>簡單來說，可以說 Angular 的 zone (<em><strong>NgZone</strong></em>) 在每次攔截的操作完成後，檢查 microtask queue 是否為空。如果是，則會觸發一個特殊事件，這個事件被 scheduler 使用，最終觸發 Change Detection 的運行。我們不會深入探討更多細節，但如果你對此機制不熟悉，強烈建議閱讀<a target="_blank" rel="noopener" href="https://angular.love/running-change-detection-autorun-with-zones">這篇文章</a>（或者如果你真的感興趣，可以閱讀<a target="_blank" rel="noopener" href="https://angular.love/search?q=zone.js">所有相關文章</a>）。</p>
+<p>關鍵點在於理解 <em><strong>Zone.js</strong></em> 向 Angular 提供關於完成操作的通知，促使框架通過運行 Change Detection 做出響應。需要注意的是，這種配置並不知道 Template 綁定的資料實際上是否有改變，因此刷新可能必要也可能不必要。</p>
+<h3 id="How？"><a href="#How？" class="headerlink" title="How？"></a>How？</h3><p>「<strong>How</strong>」部分聚焦於 Change Detection 執行的機制，包括組件樹的遍歷以及檢查變更的過程。一旦排定了 Change Detection 執行，就必須了解這對我們的應用程式意味著什麼、執行方式爲何，以及可能的結果。</p>
+<p>以下是 Change Detection 基本知識的簡要回顧，這些知識將幫助我們進一步討論。你也可以考慮閱讀<a target="_blank" rel="noopener" href="https://angular.love/change-detection-big-picture-overview">這篇概述</a>，它簡要解釋了該主題。</p>
+<p>Angular 的組件結構形成一棵樹。在默認配置下，以下規則以高層次的方式描述了該流程的執行方式：</p>
+<ul>
+<li><p>該過程從根組件開始。</p>
+</li>
+<li><p>整個組件樹都會檢查是否有變更，意味著每個節點都會被訪問。</p>
+</li>
+<li><p>遍歷方向為自上而下。</p>
+</li>
+<li><p>節點的訪問順序遵循深度優先搜索（DFS）算法。</p>
+</li>
+</ul>
+<p>以下動畫說明了這個過程：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/Change-Detection.gif"></p>
+<p>當<strong>訪問</strong>或<strong>偵測到變更</strong>單個節點時，會發生什麼？這涉及多個操作，包括執行 lifecycle hooks 、更新綁定以及必要時刷新畫面。我們不會深入這些細節，因為它們屬於更廣泛的主題。對於本文而言，只需記住：如果發生數據變更，component view 會在 Change Detection 的過程中更新即可。</p>
+<h3 id="Change-Detection-策略-–-OnPush"><a href="#Change-Detection-策略-–-OnPush" class="headerlink" title="Change Detection 策略 – OnPush"></a>Change Detection 策略 – OnPush</h3><p>在 Angular 中，有兩種 Change Detection 策略：<em><strong>Default</strong></em> 和 <em><strong>OnPush</strong></em><strong>。「How」章節中描述的規則實際上就是 <em>Default</em></strong> 策略的行為規範。那麼，<em>OnPush</em> 有何不同？</p>
+<p>基本的樹遍歷規則保持不變，但 <em><strong>OnPush</strong></em> 策略允許我們在 Change Detection 期間「剪除」或跳過一些樹的分支。這減少了執行的操作數量，從而提高了性能。</p>
+<p>當一個組件使用 <em><strong>OnPush</strong></em> 策略時，它（以及其子組件）不會總是被檢測。它們僅在被標記為「dirty」時才會被檢測。如果組件沒有被標記為 dirty，則整個分支都會被跳過。</p>
+<p>可以在應用中混合使用 <em><strong>Default</strong></em> 和 <em><strong>OnPush</strong></em> 組件。例如，如果父組件是 <em><strong>OnPush</strong></em>，而子組件是 <em><strong>Default</strong></em>，只要父組件被標記為 dirty 並未被剪除，子組件仍然會被檢測。</p>
+<p>此時，我們可以重新審視「整個組件樹都會被檢查，意味著每個節點都會被訪問」的規則。如果我們使用 <em><strong>OnPush</strong></em> 組件，這一點將不再成立，這構成了一個例外。</p>
+<p>以下是該過程的動畫展示：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/onPush.gif"></p>
+<h3 id="Dirty-標記"><a href="#Dirty-標記" class="headerlink" title="Dirty 標記"></a>Dirty 標記</h3><p>在上一節中，我們提到 <em><strong>OnPush</strong></em> 策略依賴於組件的「dirty」狀態來進行 Change Detection 。一個常見的問題是：什麼會使組件變得「dirty」？這裡有一組封閉的操作集可以將組件設為這種狀態：</p>
+<ul>
+<li><p>輸入值改變（immutable）。</p>
+</li>
+<li><p>發生模板綁定事件（包括 output emit 和 host listener）。</p>
+</li>
+<li><p>一個值被異步管道（async pipe）使用。</p>
+</li>
+<li><p>直接呼叫 <code>ChangeDetectorRef.markForCheck()</code>。</p>
+</li>
+<li><p><code>@defer</code> 區塊的狀態變化。</p>
+</li>
+</ul>
+<p>另一個重要的點是，這些操作會「向上冒泡」穿過組件層級結構。這由 <code>markViewDirty</code> 函數負責。這意味著不僅變更來源的組件會被標記為 dirty（例如上圖中的 F），其所有的父組件（如 E 和 A）也會被標記為 dirty。這確保了嵌套的組件（例如 F）在 Change Detection 中總會被訪問，不會被任何 <em><strong>OnPush</strong></em> 且非 dirty 的父組件（如 E）剪除。</p>
+<p>唯一的例外是當組件由於來自父組件綁定的輸入值變化而被標記為 dirty。在這種情況下，父組件已經處於其自身的 Change Detection 檢查過程中，因此無需再次將其標記為 dirty。此時，僅接收輸入的組件會被標記，允許 Change Detection 在父組件完成後處理它。</p>
+<h2 id="改善「如何」-–-信號（Signals）"><a href="#改善「如何」-–-信號（Signals）" class="headerlink" title="改善「如何」 – 信號（Signals）"></a>改善「如何」 – 信號（Signals）</h2><p>現在我們已經回顧了 Angular 長期以來的 Change Detection 規則，可以探索該過程如何得到改進。</p>
+<p>最近，信號（signals）成為框架許多令人興奮改進背後的推動力， Change Detection 也不例外。在改善「如何」這方面，信號比標準流程有了顯著提升。讓我們更詳細地了解它的工作原理，以及開發者需要進行哪些調整。</p>
+<p>本文假設你已對信號、信號圖（signal graphs）及相關概念有基本了解。如果沒有，強烈建議先閱讀 Max Koretskyi 的深入文章：<a target="_blank" rel="noopener" href="https://angular.love/signals-in-angular-deep-dive-for-busy-developers">Signals in Angular – Deep Dive for Busy Developers</a>。</p>
+<p>第一個關鍵概念是，從信號圖的角度來看，組件視圖是作為一個反應式消費者（reactive consumer）運行的，這意味著它會響應模板中信號的讀取。我們可以將其可視化如下：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/reactive-consumer.png"></p>
+<p>當模板中讀取的信號接收到新值時，它會將反應式消費者標記為 dirty。需要強調的是，這裡標記為 dirty 的是附加到組件視圖的反應式消費者，而不是組件視圖本身（即組件樹中的節點）。否則，它將與普通的 <em><strong>OnPush</strong></em> 策略類似。由於這一區別，我們可以得到不同的結果，稍後你會看到。</p>
+<p>但將反應式消費者標記為 dirty 對於我們的應用意味著什麼？這取決於你所使用的 Angular 版本。</p>
+<p>在 Angular 17 之前，將反應式消費者標記為 dirty 也會將組件視圖標記為 dirty，其行為與使用 <strong>AsyncPipe</strong> 類似。</p>
+<p>在這種情況下，我們能實現的最佳效果是為所有組件使用 <em><strong>OnPush</strong></em> 策略，從而將 Change Detection 限制到單一路徑：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/one-path.gif"></p>
+<p>然而，如我們剛剛所發現的，這與 <strong>AsyncPipe</strong> 的工作方式完全相同，因此看起來並沒有什麼特別的好處。</p>
+<p>情況在 Angular 17 或更高版本中發生了重大改變。在這些版本中，將反應式消費者標記為 dirty 不再將整個組件標記為 dirty。相反，會觸發一個新函數 <code>markAncestorsForTraversal</code>。這個函數從組件開始，向上遍歷其祖先直到根組件（與 <code>markViewDirty</code> 類似），但不同之處在於，當前組件保持不變（因為反應式消費者已標記為 dirty），而其祖先則被標記為新標誌 <strong>HasChildViewsToRefresh</strong>。這樣的操作如下圖所示：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/mark-traversal.gif"></p>
+<p> Change Detection 的遍歷機制也被更新。現在，當 Change Detection 從這樣的樹結構開始時，它會通過 A 和 E 組件，而不對它們進行 Change Detection 。原因是它們是 <em><strong>OnPush</strong></em> 且不是 dirty 的。得益於新標誌 <strong>HasChildViewsToRefresh</strong>，Angular 繼續訪問標有此標誌的節點，搜尋需要 Change Detection 的組件（在此例中為標記有 dirty 的反應式消費者的組件 F）。當到達 F 組件時，發現其反應式消費者為 dirty，該組件因此進行 Change Detection ——且僅此一個！</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/one-node.gif"></p>
+<p>很酷，對吧？我們已經從檢測整個組件路徑變更到只檢測單個組件。雖然這是簡化的組件樹例子，但在實際應用中，性能提升更加顯著。</p>
+<p>這種基於信號的全新 Change Detection 方法——僅檢測一個組件的方式，通常被稱為「<strong>semi-local</strong>」（半本地化）或「<strong>global-local&#x2F;glocal</strong>」（全局-本地化） Change Detection 。</p>
+<h3 id="注意事項"><a href="#注意事項" class="headerlink" title="注意事項"></a>注意事項</h3><p>然而，有一些注意事項需要考慮。我們來看一個例子，其中用戶點擊觸發了信號值的更改：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/caveat1.gif"></p>
+<p>點擊按鈕後，我們注意到與之前描述的場景不同，我們的組件及其所有祖先都被標記為 dirty，導致它們全都被 Change Detection 。為什麼會這樣？原因在於舊的 Change Detection 規則仍在生效。你還記得哪些行為會將組件標記為 dirty 嗎？其中之一是模板綁定事件，而這正是此處發生的事情。如果你調試這樣的例子，會發現儘管 <code>markAncestorsForTraversal</code> 被調用，但 <code>markViewDirty</code> 也被調用。</p>
+<p>這導致我們得出結論：信號值更改的來源很重要。如果它來自於某些會將組件標記為 dirty 的操作，那麼與標準的 <em><strong>OnPush</strong></em> 策略相比並沒有優勢。為了受益於半本地化 Change Detection ，觸發必須來自不會將組件標記為 dirty 但仍能為我們排定 Change Detection 的操作。例如：</p>
+<ul>
+<li><p><code>setInterval</code>、<code>setTimeout</code></p>
+</li>
+<li><p><code>Observable.subscribe</code>、<code>toSignal(Observable)</code>，例如 <code>HttpClient</code> 調用</p>
+</li>
+<li><p>RxJS 的 <code>fromEvent</code> 或 <code>Renderer2.listen</code></p>
+</li>
+</ul>
+<p>另一個更明顯但仍可能阻礙我們努力的注意事項是應用中某些組件未使用 <em><strong>OnPush</strong></em> 策略。假設信號值變更的觸發源不會將組件標記為 dirty，下面這棵樹中 ABCD 子樹仍會進行 Change Detection ，因為這些組件未使用 <em><strong>OnPush</strong></em>，且每次運行中都會檢查它們的變更（默認策略仍適用）。</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/caveat2a.gif"></p>
+<h2 id="改善「何時」—Zoneless（無-Zone-js）"><a href="#改善「何時」—Zoneless（無-Zone-js）" class="headerlink" title="改善「何時」—Zoneless（無 Zone.js）"></a>改善「何時」—Zoneless（無 Zone.js）</h2><p>我們剛剛探討了信號在改善 Angular  Change Detection 流程「<strong>如何</strong>」方面的重大作用。現在，我們來看看「<strong>何時</strong>」部分可以如何改進。Angular 團隊的答案是轉向「無 Zone.js」（<em><strong>Zoneless</strong></em>）。</p>
+<h3 id="為什麼移除-Zone-js？"><a href="#為什麼移除-Zone-js？" class="headerlink" title="為什麼移除 Zone.js？"></a>為什麼移除 Zone.js？</h3><p>首先，讓我們考慮一下為什麼要完全移除 <em><strong>Zone.js</strong></em>。這裡有幾個原因：</p>
+<p>請不要誤解我的意思——我認為 <em><strong>Zone.js</strong></em> 是一個令人著迷的工具（至少在它推出的時候是這樣的），它自始至終對 Angular 的成功起到了重要作用。它讓開發者更輕鬆地使用框架，即便是新手開發者也能簡單地專注於他們的任務，剩下的「魔法」由框架處理。</p>
+<p>然而，正如我們所見，這種「魔法」是有代價的。雖然許多應用可能在使用 <em><strong>Zone.js</strong></em> 時運行得非常好，但當面對更複雜的解決方案，並需要提升性能時，尋找替代方案是一個合理的選擇。</p>
+<h3 id="Zoneless-調度器"><a href="#Zoneless-調度器" class="headerlink" title="Zoneless 調度器"></a>Zoneless 調度器</h3><p>在 Angular 17.1 中推出的新 <em><strong>Zoneless</strong></em> 調度器不再依賴於 <em><strong>Zone.js</strong></em> 事件，而是等待框架其他部分的顯式通知來處理變更。這一轉變非常重要：框架不再基於「當某些操作剛剛發生，並且可能發生了某些改變」來觸發 Change Detection ，而是基於「當收到數據已改變的通知時」來進行觸發。</p>
+<p>為實現這一點，新調度器提供了一個特殊的 <code>notify</code> 方法，在以下場景中會被調用：</p>
+<ul>
+<li><p>當模板中的信號讀取到新值（具體來說，當 <code>markAncestorsForTraversal</code> 被調用時）。</p>
+</li>
+<li><p>當通過 <code>markViewDirty</code> 函數將組件標記為 dirty 時。這可能發生在組件通過 <strong>AsyncPipe</strong> 接收到新值、模板綁定事件、調用 <code>ComponentRef.setInput</code> 或顯式調用 <code>ChangeDetectorRef.markForCheck</code> 等情況下。</p>
+</li>
+<li><p>當一個 <code>afterRender</code> 鉤子被註冊、視圖重新附加到 Change Detection 樹或從 DOM 中移除時。在這些情況下，<code>notify</code> 方法會被調用，但它僅執行鉤子，並不刷新視圖。</p>
+</li>
+</ul>
+<p>你可能會擔心 Change Detection 是否會過於頻繁地運行，比如當多個信號值快速變更或事件頻繁觸發時。幸運的是，調度器的實現設計得非常高效。它會在短時間內收集通知，並排程單次 Change Detection 運行，而不是多次觸發。這種行為基於 <code>setTimeout</code> 和 <code>requestAnimationFrame</code> 的競態條件，但我們不會深入這些細節。關鍵在於這些 <code>notify</code> 調用會被合併，確保最佳性能。</p>
+<p>要啟用新調度器，你需要按如下方式更新你的應用（關鍵新增項是 <code>provideExperimentalZonelessChangeDetection</code>，其餘部分取決於你的現有設置）：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">ApplicationConfig</span>, provideExperimentalZonelessChangeDetection &#125; <span class="keyword">from</span> <span class="string">&#x27;@angular/core&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; bootstrapApplication &#125; <span class="keyword">from</span> <span class="string">&quot;@angular/platform-browser&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">AppComponent</span> &#125; <span class="keyword">from</span> <span class="string">&quot;./app.component&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="attr">appConfig</span>: <span class="title class_">ApplicationConfig</span> = &#123;</span><br><span class="line">  <span class="attr">providers</span>: [</span><br><span class="line">    <span class="title function_">provideExperimentalZonelessChangeDetection</span>(),</span><br><span class="line">  ]</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="title function_">bootstrapApplication</span>(<span class="title class_">AppComponent</span>, appConfig)</span><br><span class="line">  .<span class="title function_">catch</span>(<span class="function">(<span class="params">err</span>) =&gt;</span> <span class="variable language_">console</span>.<span class="title function_">error</span>(err));</span><br><span class="line"></span><br><span class="line"><span class="comment">// 從 angular.json 中移除以下內容：</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// &quot;polyfills&quot;: [</span></span><br><span class="line"><span class="comment">//   &quot;zone.js&quot;</span></span><br><span class="line"><span class="comment">// ],</span></span><br></pre></td></tr></table></figure>
+
+<p>以下動畫展示了在使用 <em><strong>OnPush</strong></em> 策略和信號的應用中，新 <em><strong>Zoneless</strong></em> 調度器的運作方式：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/10/zoneless.gif"></p>
+<p>這當然是最佳情況：信號值變更只標記了一個組件進行 Change Detection 並觸發檢測運行。這意味著我們僅在必要的地方進行 Change Detection ，且僅在需要的時候執行。</p>
+<h3 id="區域化-混合調度器"><a href="#區域化-混合調度器" class="headerlink" title="區域化&#x2F;混合調度器"></a>區域化&#x2F;混合調度器</h3><p>在上一章中，我們提到 <em><strong>Zoneless</strong></em> 調度器在 Angular 17.1 中首次引入。Angular 18 不僅顯著改進了這一實現，還為現有的基於 <em><strong>Zone.js</strong></em> 的調度器帶來了一項令人興奮的增強功能，即加入了我們在 <em><strong>Zoneless</strong></em> 調度器中看到的顯式通知機制。這意味著，調度器現在不僅監聽 <em><strong>Zone.js</strong></em> 事件，還會因 <code>notify</code> 方法的調用而觸發。</p>
+<p>在 Angular 18 之前，如果信號值在 Zone.js 外發生變更， Change Detection 不會被排程——只有在 Zone.js 內執行的操作才能保證排程。例如，以下代碼不會導致視圖刷新：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">zone.<span class="title function_">runOutsideAngular</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">  httpClient.<span class="property">get</span>&lt;<span class="title class_">Post</span>&gt;(<span class="string">&#x27;https://jsonplaceholder.typicode.com/posts/1&#x27;</span>)</span><br><span class="line">    .<span class="title function_">pipe</span>(</span><br><span class="line">      <span class="title function_">delay</span>(<span class="number">3000</span>),</span><br><span class="line">      <span class="title function_">map</span>(<span class="function">(<span class="params">res</span>) =&gt;</span> res.<span class="property">title</span>)</span><br><span class="line">    ).<span class="title function_">subscribe</span>(<span class="function">(<span class="params">title</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">title</span>.<span class="title function_">set</span>(title);</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>使用增強的混合調度器，在相同的場景下，我們仍然可以實現視圖刷新。這是因為信號值的更改會調用 <code>notify</code> 方法，無論我們處於 Zone.js 內部還是外部。</p>
+<p>這為尚未準備完全轉向 <em><strong>Zoneless</strong></em> 的應用程序提供了許多新可能性，同時也能受益於漸進式的過渡。</p>
+<h2 id="總結"><a href="#總結" class="headerlink" title="總結"></a>總結</h2><p>希望本文能幫助你理解 Angular  Change Detection 機制的最新進展，以及這些概念如何協同工作。我也希望你能從中得出結論：不必一次性全面採用這些新功能。如果這成為你使用最新功能的阻礙，請記住，你可以穩步地逐步適配信號功能，使更多組件兼容 <em><strong>OnPush</strong></em> 策略，最終轉向 <em><strong>Zoneless</strong></em> 方法。在此期間，你仍然可以收穫其中的好處。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

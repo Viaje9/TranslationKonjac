@@ -1,0 +1,209 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>變更偵測大觀 – 總覽 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/change-detection-big-picture-overview
+變更偵測概觀 - 總覽概觀在任何應用程式中，更新螢幕的過程都需要程式的內部狀態，並將其投影到使用者可以在螢幕上看到的東西。在網頁開發中，我們會使用諸如物件和陣列之類的資料結構，並最終以影像、按鈕和其他視覺元素的形式呈現該資料的 DOM 表示法。框架負責同步應用程式的內部狀態和底層平台。但是，它們不僅減輕了我們的負擔，而且還非常有效地進行狀態追蹤和 DOM 更新。
+這種同步機制稱為渲染。它有不同的名稱 – Angular 中的變更偵測或 React 中的協調 – 但它執行的核心操作在不同的實作中是相似的。變更偵測是架構中最重要的部分之一，因為它負責更新負責可見部分的平台模型 (DOM)。它也是顯著影響應用程式效能的領域。接下來，我將交替使用渲染和變更偵測這兩個術語。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="變更偵測大觀 – 總覽"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">變更偵測大觀 – 總覽</h1>
+  
+
+      
+        <time datetime="2024-12-31T09:08:14.000Z">2024-12-31</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/change-detection-big-picture-overview">https://angular.love/change-detection-big-picture-overview</a></p>
+<h1 id="變更偵測概觀-總覽"><a href="#變更偵測概觀-總覽" class="headerlink" title="變更偵測概觀 - 總覽"></a>變更偵測概觀 - 總覽</h1><h2 id="概觀"><a href="#概觀" class="headerlink" title="概觀"></a>概觀</h2><p>在任何應用程式中，更新螢幕的過程都需要程式的內部狀態，並將其投影到使用者可以在螢幕上看到的東西。在網頁開發中，我們會使用諸如物件和陣列之類的資料結構，並最終以影像、按鈕和其他視覺元素的形式呈現該資料的 DOM 表示法。框架負責同步應用程式的內部狀態和底層平台。但是，它們不僅減輕了我們的負擔，而且還非常有效地進行狀態追蹤和 DOM 更新。</p>
+<p>這種同步機制稱為渲染。<br>它有不同的名稱 – Angular 中的變更偵測或 React 中的協調 – 但它執行的核心操作<br>在不同的實作中是相似的。<br>變更偵測是架構中最重要的部分之一，因為<br>它負責更新負責可見部分的平台模型 (DOM)。<br>它也是顯著影響應用程式效能的領域。<br>接下來，我將交替使用渲染和變更偵測這兩個術語。</p>
+<span id="more"></span>
+
+<p>為了定義 UI 和應用程式狀態之間的關係，我們在範本中使用表達式。<br>在下面的範本中，我們表示 DOM 屬性 <code>className</code> 取決於元件的屬性 <code>rating</code>。<br>因此，每當評分變更時，都應重新評估表達式。<br>如果偵測到變更，則應更新 <code>className</code> 屬性。</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">div</span> [<span class="attr">className</span>]=<span class="string">&quot;&#x27;fa-star &#x27; + (rating &gt; value ? &#x27;fas&#x27; : &#x27;far&#x27;)&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>在 Angular 中，當編譯器分析範本時，它會識別與 DOM 元素相關聯的元件屬性。<br>對於每個此類關聯，編譯器都會建立一個繫結。<br>繫結定義了元件的屬性（通常包裝在某些表達式中）和 DOM 元素屬性之間的關係。<br><strong>變更偵測機制會執行處理繫結的指令。</strong><br>這些指令的工作是檢查具有元件屬性的表達式的值是否已變更<br>並在必要時執行 DOM 更新。</p>
+<p>處理執行髒檢查並更新 DOM 相關部分的繫結是 Angular 中變更偵測的核心操作。<br>我們將在 <a target="_blank" rel="noopener" href="https://angular.love/en/change-detection-big-picture-operations/">操作</a> 章節中詳細介紹其他操作。<br>現在讓我們快速看看 Angular 如何更新 DOM。</p>
+<h2 id="DOM-更新總覽"><a href="#DOM-更新總覽" class="headerlink" title="DOM 更新總覽"></a>DOM 更新總覽</h2><p>這個互動式小工具允許使用者按一下任何星星並設定新的評分：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/6.gif" alt="圖片 19：圖片替代文字"></p>
+<p>以下是如何實作它：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">	<span class="attr">selector</span>: <span class="string">&quot;rating-widget-cmp&quot;</span>,</span><br><span class="line">	<span class="attr">template</span>: <span class="string">`</span></span><br><span class="line"><span class="string">		&lt;ul class=&quot;rating&quot;&gt;</span></span><br><span class="line"><span class="string">			&lt;li</span></span><br><span class="line"><span class="string">				*ngFor=&quot;let value of values&quot;</span></span><br><span class="line"><span class="string">				[className]=&quot;&#x27;fa-star &#x27; + (rating &gt; value ? &#x27;fas&#x27; : &#x27;far&#x27;)&quot;</span></span><br><span class="line"><span class="string">				(click)=&quot;onRatingClick(value)&quot;</span></span><br><span class="line"><span class="string">			&gt;</span></span><br><span class="line"><span class="string">				&#123;&#123; value &#125;&#125;</span></span><br><span class="line"><span class="string">			&lt;/li&gt;</span></span><br><span class="line"><span class="string">		&lt;/ul&gt;</span></span><br><span class="line"><span class="string">	`</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">RatingWidgetComponent</span> &#123;</span><br><span class="line">	values = [<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>];</span><br><span class="line">	rating = <span class="number">2</span>;</span><br><span class="line"></span><br><span class="line">	<span class="title function_">onRatingClick</span>(<span class="params"><span class="attr">v</span>: <span class="built_in">number</span></span>) &#123;</span><br><span class="line">		<span class="variable language_">this</span>.<span class="property">rating</span> = v + <span class="number">1</span>;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>範本中的 <code>rating</code> 屬性透過以下表達式繫結到 <code>className</code> 屬性：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[className]=&quot;&#x27;fa-star &#x27; + (rating &gt; value ? &#x27;fas&#x27; : &#x27;far&#x27;)&quot;</span><br></pre></td></tr></table></figure>
+
+<p>對於範本的這部分，編譯器會產生設定繫結、執行髒檢查和更新 DOM 的指令。<br>以下是為我們的範本產生的程式碼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (changeDetectionPhase) &#123;</span><br><span class="line">    <span class="title function_">property</span>(<span class="string">&quot;className&quot;</span>, <span class="string">&quot;fa-star &quot;</span> + (ctx.<span class="property">rating</span> &gt; <span class="number">0</span> ? <span class="string">&quot;fas&quot;</span> : <span class="string">&quot;far&quot;</span>));</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在這裡，我們可以看到指令 <code>property</code>（在來源中以 <code>ɵɵ</code> 作為字首），它會檢查表達式的值是否已變更，<br>如果是，則將繫結標記為已變更並更新值。<br>Angular 為 <code>className</code> 建立繫結，並且繫結的目前值為 <code>&#39;fa-star far&#39;</code>。<br>一旦元件中的評分屬性更新，Angular 就會執行變更偵測並處理這些指令。</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/40c138c13d17b638908999faafc9eb4cca0202fb/packages/core/src/render3/instructions/property.ts#L35-L35">property</a><br>指令在簡化的程式碼中如下所示：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">property</span>(<span class="params">propName, value, ...</span>) &#123;</span><br><span class="line">  <span class="keyword">const</span> lView = <span class="title function_">getLView</span>();</span><br><span class="line">  <span class="keyword">const</span> bindingIndex = <span class="title function_">nextBindingIndex</span>();</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (<span class="title function_">bindingUpdated</span>(lView, bindingIndex, value)) &#123;</span><br><span class="line">    <span class="keyword">const</span> tView = <span class="title function_">getTView</span>();</span><br><span class="line">    <span class="keyword">const</span> tNode = <span class="title function_">getSelectedTNode</span>();</span><br><span class="line">    <span class="title function_">elementPropertyInternal</span>(tView, tNode, lView, propName, value, ...);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> property;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>首先，我們取得 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/da7318e2fa9d35af46387965f92b6871ca7946a4/packages/core/src/render3/interfaces/view.ts#L79">LView</a> 的參考，<br>它是 Angular 元件和所有相關資料的容器。<br>然後，使用 <code>nextBindingIndex</code>，我們擷取 <code>LView</code> 中的索引，該索引保留有關 <code>propName</code> 繫結的資訊。<br>在我們的例子中，它是 <code>className</code> 屬性。</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/663d477cb04da4960a9a6552c556abe73417b95b/packages/core/src/render3/bindings.ts#L46">bindingUpdated</a><br>函式會評估表達式，並使用它來與繫結記住的先前值進行比較。<br>這就是「髒檢查」名稱的由來。如果值已變更，它會更新目前值並回傳 <code>true</code>：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/2-1.png" alt="圖片 20：圖片替代文字"></p>
+<p>如果表達式已變更，Angular 會執行 <code>elementPropertyInternal</code> 函式，該函式會使用新值來更新 DOM。<br>在我們的例子中，它會更新清單項目的 <code>className</code> 屬性。</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/4-2.png" alt="圖片 21：圖片替代文字"></p>
+<p><code>property</code> 函式會回傳自身，以便可以鏈接：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">property</span>(<span class="string">&quot;name&quot;</span>, ctx.<span class="property">name</span>)(<span class="string">&quot;title&quot;</span>, ctx.<span class="property">title</span>);</span><br></pre></td></tr></table></figure>
+
+<p>就這樣。我們將在「渲染引擎內部」一節中詳細了解其他指令。</p>
+<h2 id="觸發變更偵測"><a href="#觸發變更偵測" class="headerlink" title="觸發變更偵測"></a>觸發變更偵測</h2><p>若要全面了解變更偵測，我們需要知道 Angular 何時執行處理繫結的指令。</p>
+<p>有兩種方法可以啟動變更偵測。第一種是<strong>明確告知框架</strong><br>某些內容已變更或有可能發生變更，因此它應執行變更偵測。<br>基本上，透過這種方式，我們手動啟動變更偵測。<br>第二種方法是<strong>依賴外部機制</strong>來知道何時有可能<br>發生變更，並自動執行變更偵測。</p>
+<p>在 Angular 中，我們有這兩種選項。我們可以使用變更偵測器服務來<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/a98fa489fb498273bdfde2fa4598893d1d53582e/packages/core/src/render3/view_ref.ts#L273">手動執行變更偵測</a>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">RatingWidgetComponent</span> &#123;</span><br><span class="line">	values = [<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>];</span><br><span class="line">	rating = <span class="number">2</span>;</span><br><span class="line"></span><br><span class="line">	<span class="title function_">constructor</span>(<span class="params"><span class="keyword">private</span> <span class="attr">changeDetector</span>: <span class="title class_">ChangeDetectorRef</span></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">	<span class="title function_">onRatingClick</span>(<span class="params"><span class="attr">v</span>: <span class="built_in">number</span></span>) &#123;</span><br><span class="line">		<span class="variable language_">this</span>.<span class="property">rating</span> = v + <span class="number">1</span>;</span><br><span class="line">		<span class="variable language_">this</span>.<span class="property">changeDetector</span>.<span class="title function_">detectChanges</span>();</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但是，我們也可以依賴框架自動觸發變更偵測。<br>透過這種方式，我們只需更新元件上的屬性：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">RatingWidgetComponent</span> &#123;</span><br><span class="line">	values = [<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>];</span><br><span class="line">	rating = <span class="number">2</span>;</span><br><span class="line"></span><br><span class="line">	<span class="title function_">onRatingClick</span>(<span class="params"><span class="attr">v</span>: <span class="built_in">number</span></span>) &#123;</span><br><span class="line">		<span class="variable language_">this</span>.<span class="property">rating</span> = v + <span class="number">1</span>;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Angular 需要以某種方式知道屬性已更新，並且它應執行變更偵測。<br>若要解決這個問題，Angular 會使用名為<br><a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">zone.js</a> 的函式庫。<br>它會修補瀏覽器中的所有非同步事件，然後可以在發生特定事件時通知 Angular。<br>與 UI 事件類似，Angular 然後可以等待應用程式碼完成執行<br>並自動啟動變更偵測。我們將在 <a target="_blank" rel="noopener" href="https://angular.love/en/change-detection-big-picture-overview">zones 部分</a> 中詳細探討 <code>zone.js</code>。</p>
+<h2 id="檢查順序"><a href="#檢查順序" class="headerlink" title="檢查順序"></a>檢查順序</h2><p>Angular 會以深度優先的順序對每個元件執行變更偵測。這表示對於下面描述的元件樹狀結構，檢查將會以下列順序發生 <code>A、K、L、J、O、C</code> 等等：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/7-1.gif" alt="圖片 22：圖片替代文字"></p>
+<p>由於元件檢查包含多個操作，因此執行某些步驟的順序可能會產生一些不同的結果。例如，導致 DOM 和繫結更新的操作會以正確的深度優先順序執行。我使用函式 <code>logRender</code> 來記錄 Angular 何時更新範本並執行函式來評估範本表達式：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">	<span class="attr">selector</span>: <span class="string">&quot;a-cmp&quot;</span>,</span><br><span class="line">	<span class="attr">template</span>: <span class="string">`&#123;&#123; logRender() &#125;&#125;`</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">A</span> &#123;</span><br><span class="line">	<span class="title function_">logRender</span>(<span class="params"></span>) &#123;</span><br><span class="line">		<span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;A&quot;</span>);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>請查看 <a target="_blank" rel="noopener" href="https://stackblitz.com/edit/angular-ivy-pfemyn?file=src/app/components.ts">這裡</a> 的即時執行範例。</p>
+<p>但是，如果我將記錄新增到 <a target="_blank" rel="noopener" href="https://angular.love/if-you-think-ngdocheck-means-your-component-is-being-checked-read-this-article/"><code>ngDoCheck</code></a> 鉤子中，如下所示：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">	<span class="attr">selector</span>: <span class="string">&quot;a-cmp&quot;</span>,</span><br><span class="line">	<span class="attr">template</span>: <span class="string">`A`</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">A</span> &#123;</span><br><span class="line">	<span class="title function_">ngDoCheck</span>(<span class="params"></span>) &#123;</span><br><span class="line">		<span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;A&quot;</span>);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這是你將看到的順序：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/8-1.gif" alt="圖片 23：圖片替代文字"></p>
+<p>Angular 會檢查 <code>A</code>、<code>K</code>，然後檢查 <code>V</code>、<code>L</code>，然後檢查 <code>C</code>，依此類推。<br>請查看 <a target="_blank" rel="noopener" href="https://stackblitz.com/edit/angular-ivy-cvy5ze?file=src/app/app.component.ts">這裡</a> 的即時執行範例。</p>
+<p>這既不是深度優先演算法，也不是廣度優先演算法。<br>廣度優先演算法的傳統實作會檢查同一層級上的所有同級項目，<br>而如你在上面的圖表中看到的，該演算法確實會檢查 <code>L</code> 和 <code>C</code> 同級元件，<br>但它不是檢查 <code>X</code> 和 <code>F</code>，而是向下到 <code>J</code> 和 <code>O</code>。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

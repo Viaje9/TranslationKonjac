@@ -1,0 +1,227 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Running change detection - Autorun with zones › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/running-change-detection-autorun-with-zones
+執行 Change Detection – 使用 Zones 自動執行使用 zones 自動執行Angular 中的變更偵測（渲染）通常是因瀏覽器中的非同步事件而完全自動觸發的。這是透過使用 zone.js 函式庫實作的 zones 來實現的。一般來說，zones 提供了一種機制來攔截非同步操作的排程和調用。攔截器邏輯可以在任務之前或之後執行額外的程式碼，並通知相關方有關該事件。這些規則在建立每個 zone 時會個別定義。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="Running change detection - Autorun with zones"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">Running change detection - Autorun with zones</h1>
+  
+
+      
+        <time datetime="2024-12-31T03:22:14.000Z">2024-12-31</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/running-change-detection-autorun-with-zones">https://angular.love/running-change-detection-autorun-with-zones</a></p>
+<h1 id="執行-Change-Detection-–-使用-Zones-自動執行"><a href="#執行-Change-Detection-–-使用-Zones-自動執行" class="headerlink" title="執行 Change Detection – 使用 Zones 自動執行"></a>執行 Change Detection – 使用 Zones 自動執行</h1><h2 id="使用-zones-自動執行"><a href="#使用-zones-自動執行" class="headerlink" title="使用 zones 自動執行"></a>使用 zones 自動執行</h2><p>Angular 中的變更偵測（渲染）通常是因瀏覽器中的非同步事件而完全自動觸發的。<br>這是透過使用 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/297d865e9e1ca0ffa183988c16429f16bc2ccbd7/packages/zone.js">zone.js</a> 函式庫實作的 zones 來實現的。<br>一般來說，zones 提供了一種機制來攔截非同步操作的排程和調用。<br>攔截器邏輯可以在任務之前或之後執行額外的程式碼，並通知相關方有關該事件。<br>這些規則在建立每個 zone 時會個別定義。</p>
+<span id="more"></span>
+
+<p>Zones 以階層式的父子關係組成。<br>一開始，瀏覽器會在一個特殊的根 zone 中運行，該根 zone 被配置為表現得與平台完全相同，<br>使任何現有的非 zone 感知的程式碼都能如預期般運行。<br>在任何給定時間，只有一個 zone 可以處於活動狀態，並且可以透過 <code>Zone.current</code> 屬性檢索此 zone：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/1-11.png" alt="圖片 15：圖片替代文字"></p>
+<p>如果你有興趣學習如何直接使用 zone.js，請查看<a target="_blank" rel="noopener" href="https://angular.love/en/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">這篇文章</a>。</p>
+<p><strong>與普遍的看法相反，zones 不是 Angular 中變更偵測機制的一部分。</strong><br>事實上，Angular 可以使用 [變更偵測服務] 在沒有 zones 的情況下工作。<br>為了啟用自動變更偵測，Angular 實作了<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/30d5a2ca83c9cf44f602462597a58547b05b75dd/packages/core/src/zone/ng_zone.ts#L86">NgZone</a><br>服務，該服務會 fork 一個子 zone 並訂閱來自該 zone 的通知。</p>
+<p>這個 zone 被稱為 Angular zone，並且所有應用程式特定的程式碼都應該在這個 zone 內運行。<br>這是因為 <code>NgZone</code> 只會收到在 Angular zone 內發生的事件通知，而不會收到<br>任何其他 zone 中的事件通知：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/2-13.png" alt="圖片 16：圖片替代文字"></p>
+<p>如果你探索 <code>NgZone</code>，你會看到對 fork 的 Angular zone 的引用<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/86372538ab017058cb9b2a7910e761d823bd3c16/packages/core/src/zone/ng_zone.ts#L400">儲存</a><br>在 <code>_inner</code> 屬性中：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">NgZone</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params">...</span>) &#123;</span><br><span class="line">    <span class="title function_">forkInnerZoneWithAngularBehavior</span>(self);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">forkInnerZoneWithAngularBehavior</span>(<span class="params"><span class="attr">zone</span>: <span class="title class_">NgZonePrivate</span></span>) &#123;</span><br><span class="line">  zone.<span class="property">_inner</span> = zone.<span class="property">_inner</span>.<span class="title function_">fork</span>(&#123; ... &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這是當你執行 <code>NgZone.run()</code> 時，用來執行回呼的 zone：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">NgZone</span> &#123;</span><br><span class="line">  <span class="title function_">run</span>(<span class="params">fn, applyThis, applyArgs</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">_inner</span>.<span class="title function_">run</span>(fn, applyThis, applyArgs);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>fork Angular zone 時的目前 zone 會保留在 <code>_outer</code> 屬性中，並且當你執行 <code>NgZone.runOutsideAngular()</code> 時，會用來執行回呼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">NgZone</span> &#123;</span><br><span class="line">  <span class="title function_">runOutsideAngular</span>(<span class="params">fn</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> (<span class="variable language_">this</span> <span class="keyword">as</span> <span class="built_in">any</span> <span class="keyword">as</span> <span class="title class_">NgZonePrivate</span>).<span class="property">_outer</span>.<span class="title function_">run</span>(fn);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>通常，這個外部 zone 是最頂層的「根」zone。</p>
+<p>當 Angular 完成其引導程序時，你會得到以下 zones 的階層結構：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#x27;root&#x27;;</span><br><span class="line">&#x27;angular&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>你可以透過簡單地記錄對應的屬性來輕鬆地親自查看：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">zone</span>: <span class="title class_">NgZone</span></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>((zone <span class="keyword">as</span> <span class="built_in">any</span>).<span class="property">_inner</span>.<span class="property">name</span>); <span class="comment">// angular</span></span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>((zone <span class="keyword">as</span> <span class="built_in">any</span>).<span class="property">_outer</span>.<span class="property">name</span>); <span class="comment">// root</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然而，在開發模式下，還有一個 <code>AsyncStackTaggingZone</code> 位於 <code>root</code> 和 <code>angular</code> zone 之間，如下所示：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#x27;root&#x27;;</span><br><span class="line">&#x27;AsyncStackTaggingZone&#x27;;</span><br><span class="line">&#x27;angular&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>在這種情況下，<code>NgZone</code> 實例會在其 <code>_inner</code> 屬性中保留對 <code>AsyncStackTaggingZone</code> 的引用。<br><code>AsyncStackTaggingZone</code> 提供連結的堆疊追蹤，以顯示非同步操作的排程位置。<br>有關更多詳細資訊，請參閱文章<br><a target="_blank" rel="noopener" href="https://developer.chrome.com/blog/devtools-better-angular-debugging/">使用 DevTools 進行更好的 Angular 除錯</a>。</p>
+<p>我們需要知道的最後一點是，Angular 在引導階段會實例化 <code>NgZone</code>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">PlatformRef</span> &#123;</span><br><span class="line">		bootstrapModuleFactory&lt;M&gt;(moduleFactory, options?) &#123;</span><br><span class="line">        <span class="keyword">const</span> ngZone = <span class="title function_">getNgZone</span>(options?.<span class="property">ngZone</span>, <span class="title function_">getNgZoneOptions</span>(options));</span><br><span class="line">        <span class="keyword">const</span> <span class="attr">providers</span>: <span class="title class_">StaticProvider</span>[] = [&#123;<span class="attr">provide</span>: <span class="title class_">NgZone</span>, <span class="attr">useValue</span>: ngZone&#125;];</span><br><span class="line">        <span class="comment">// 所有初始化邏輯都在 Angular zone 內運行</span></span><br><span class="line">        <span class="keyword">return</span> ngZone.<span class="title function_">run</span>(<span class="function">() =&gt;</span> &#123;...&#125;);</span><br><span class="line">		&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Angular 使用 <code>ApplicationRef</code> 內的<br><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/ff84c7360334792a9a422bd0fa0353e0cf670525/packages/core/src/application_ref.ts#L766">onMicrotaskEmpty</a><br>事件，來自動觸發整個應用程式的變更偵測：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Injectable</span>(&#123; <span class="attr">providedIn</span>: <span class="string">&#x27;root&#x27;</span> &#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ApplicationRef</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"></span></span><br><span class="line"><span class="params">    <span class="keyword">private</span> <span class="attr">_zone</span>: <span class="title class_">NgZone</span>,</span></span><br><span class="line"><span class="params">    <span class="keyword">private</span> <span class="attr">_injector</span>: <span class="title class_">EnvironmentInjector</span>,</span></span><br><span class="line"><span class="params">    <span class="keyword">private</span> <span class="attr">_exceptionHandler</span>: <span class="title class_">ErrorHandler</span></span></span><br><span class="line"><span class="params">  </span>) &#123;</span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">_onMicrotaskEmptySubscription</span> = <span class="variable language_">this</span>.<span class="property">_zone</span>.<span class="property">onMicrotaskEmpty</span>.<span class="title function_">subscribe</span>(&#123;</span><br><span class="line">      <span class="attr">next</span>: <span class="function">() =&gt;</span> &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">_zone</span>.<span class="title function_">run</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">          <span class="variable language_">this</span>.<span class="title function_">tick</span>();</span><br><span class="line">        &#125;);</span><br><span class="line">      &#125;,</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>現在讓我們看看 Angular 如何在沒有 zones 的情況下工作。</p>
+<h2 id="無-zone-應用程式"><a href="#無-zone-應用程式" class="headerlink" title="無 zone 應用程式"></a>無 zone 應用程式</h2><p>若要在沒有 <code>zone.js</code> 的情況下執行 Angular 應用程式，我們需要將 <code>noop</code> 值傳遞到 <code>bootstrapModule</code> 函式的 <code>ngZone</code> 參數中，如下所示：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">platformBrowserDynamic</span>().<span class="title function_">bootstrapModule</span>(<span class="title class_">AppModule</span>, &#123;</span><br><span class="line">  <span class="attr">ngZone</span>: <span class="string">&#x27;noop&#x27;</span>,</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>如果我們現在執行這個簡單的應用程式：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;app-root&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`&#123;&#123; time &#125;&#125;`</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  time = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我們會看到變更偵測已完全運作，並在 DOM 中呈現 <code>time</code> 值。</p>
+<p>然而，如果我們在 <code>setTimeout</code> 的回呼中更新 <code>name</code> 屬性：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;app-root&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`&#123;&#123; time &#125;&#125;`</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  time = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line"></span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">time</span> = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">    &#125;, <span class="number">1000</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我們會看到變更未更新。這是預期的行為，因為<br>沒有 Angular zone 可以通知 Angular 關於 timeout 事件的發生。<br>有趣的是，我們仍然可以將 <code>NgZone</code> 注入到建構函式中：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; ɵ<span class="title class_">NoopNgZone</span> &#125; <span class="keyword">from</span> <span class="string">&#x27;@angular/core&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">zone</span>: <span class="title class_">NgZone</span></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(zone <span class="keyword">instanceof</span> ɵ<span class="title class_">NoopNgZone</span>); <span class="comment">// true</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但它是 <code>NgZone</code> 的空實作，不執行任何操作。我們可以使用變更偵測器服務來手動執行變更偵測：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;app-root&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">`&#123;&#123; time &#125;&#125;`</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  time = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line"></span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">cdRef</span>: <span class="title class_">ChangeDetectorRef</span></span>) &#123;</span><br><span class="line">    <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">time</span> = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">      cdRef.<span class="title function_">detectChanges</span>();</span><br><span class="line">    &#125;, <span class="number">1000</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我們將在<br><a target="_blank" rel="noopener" href="https://angular.love/en/running-change-detection-manual-control/">手動控制</a>章節中詳細介紹這項服務。</p>
+<p>有趣的是，如果你放錯了 <code>cdRef.detectChanges()</code> 並將其直接放在元件的 <code>constructor</code> 中<br>在 <code>setTimeout</code> 回呼之外，如下所示：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;...&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">cdRef</span>: <span class="title class_">ChangeDetectorRef</span></span>) &#123;</span><br><span class="line">    <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">time</span> = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">    &#125;, <span class="number">1000</span>);</span><br><span class="line">    cdRef.<span class="title function_">detectChanges</span>();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Angular 將會拋出「ASSERTION ERROR」錯誤：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/08/3-11.png" alt="圖片 17：圖片替代文字"></p>
+<p>此錯誤來自<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/5f9c7ceb907be47dff3e203dd837fd6ee9133fcb/packages/core/src/render3/instructions/shared.ts#L356">此行程式碼</a>，<br>以防止在整個元件樹實例化之前執行變更偵測。</p>
+<h2 id="在-Angular-zone-內執行程式碼"><a href="#在-Angular-zone-內執行程式碼" class="headerlink" title="在 Angular zone 內執行程式碼"></a>在 Angular zone 內執行程式碼</h2><p>你可能會發現自己處於某種情況，其中一個函式以某種方式在 Angular 的 zone 之外運行，並且你無法獲得自動變更偵測的好處。這是一個常見的情況，第三方函式庫在不知道 Angular 上下文的情況下執行其操作。</p>
+<p>這裡有一個涉及<br><a target="_blank" rel="noopener" href="https://developers.google.com/api-client-library/">Google API Client Library</a> (gapi) 的<a target="_blank" rel="noopener" href="https://stackoverflow.com/a/46286400/2545680">此類問題的範例</a>。<br>常見的罪魁禍首是使用 JSONP 等技術，這些技術不使用常見的 AJAX API，如<br><a target="_blank" rel="noopener" href="https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest">XMLHttpRequest</a> 或<br><a target="_blank" rel="noopener" href="https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API">Fetch API</a>，這些 API 會由 Zones 修補和追蹤。<br>相反，它會建立一個具有來源 URL 的 <code>script</code> 標籤，並定義一個全域回呼，<br>以便在從伺服器擷取具有資料的請求指令碼時觸發。<br>Zones 無法修補或偵測到這一點，因此框架仍然不知道使用此技術執行的請求。</p>
+<p>解決此類問題的常見方法是簡單地在 Angular zone 內執行回呼，如下所示。例如，對於<br><a target="_blank" rel="noopener" href="https://github.com/google/google-api-javascript-client/blob/master/docs/start.md#option-1-load-the-api-discovery-document-then-assemble-the-request">gapi</a>，<br>我們應該這樣做：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 載入 JavaScript 客户端函式庫。</span></span><br><span class="line">gapi.<span class="title function_">load</span>(<span class="string">&#x27;client&#x27;</span>, <span class="function">()=&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// 在 Angular zone 內執行初始化程式碼</span></span><br><span class="line">    <span class="title class_">NgZone</span>.<span class="title function_">run</span>(<span class="function">()=&gt;</span>&#123;</span><br><span class="line">        <span class="comment">// 初始化 JavaScript 客户端函式庫</span></span><br><span class="line">        gapi.<span class="property">client</span>.<span class="title function_">init</span>(&#123;...&#125;).<span class="title function_">then</span>(<span class="keyword">function</span>(<span class="params"></span>) &#123; ... &#125;);</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>另一個範例是，元件會從在 Angular zone 外部運行的回呼發出通知：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;n-cmp&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">&#x27;&#123;&#123;title&#125;&#125; &lt;div&gt;&lt;n1-cmp&gt;&lt;/n1-cmp&gt;&lt;/div&gt;&#x27;</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">N</span> &#123;</span><br><span class="line">  title = <span class="string">&#x27;N component&#x27;</span>;</span><br><span class="line">  emitter = <span class="keyword">new</span> <span class="title class_">Subject</span>();</span><br><span class="line"></span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">zone</span>: <span class="title class_">NgZone</span></span>) &#123;</span><br><span class="line">    zone.<span class="title function_">runOutsideAngular</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">emitter</span>.<span class="title function_">next</span>(<span class="number">3</span>);</span><br><span class="line">      &#125;, <span class="number">1000</span>);</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果我們簡單地訂閱子元件 <code>N1</code> 中的變更，如下所示：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">  <span class="attr">selector</span>: <span class="string">&#x27;n1-cmp&#x27;</span>,</span><br><span class="line">  <span class="attr">template</span>: <span class="string">&#x27;&#123;&#123;title&#125;&#125;, 發射的值：&#123;&#123;value&#125;&#125;&#x27;</span>,</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">N1</span> &#123;</span><br><span class="line">  title = <span class="string">&#x27;N 的子項&#x27;</span>;</span><br><span class="line">  value = <span class="string">&#x27;還沒有東西&#x27;</span>;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">parent</span>: N, <span class="attr">zone</span>: <span class="title class_">NgZone</span></span>) &#123;</span><br><span class="line">    parent.<span class="property">emitter</span>.<span class="title function_">subscribe</span>(<span class="function">(<span class="params"><span class="attr">v</span>: <span class="built_in">any</span></span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">value</span> = v;</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我們不會在螢幕上看到任何更新，即使在父項發出後，<code>this.value</code> 會更新為 <code>3</code>。<br>若要修正此問題，就像在 <code>gapi</code> 範例中一樣，我們可以在 Angular zone 中執行回呼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;...&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">N1</span> &#123;</span><br><span class="line">  title = <span class="string">&#x27;N 的子項&#x27;</span>;</span><br><span class="line">  value = <span class="string">&#x27;還沒有東西&#x27;</span>;</span><br><span class="line"></span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="attr">parent</span>: N, <span class="attr">zone</span>: <span class="title class_">NgZone</span></span>) &#123;</span><br><span class="line">    parent.<span class="property">emitter</span>.<span class="title function_">subscribe</span>(<span class="function">(<span class="params"><span class="attr">v</span>: <span class="built_in">any</span></span>) =&gt;</span> &#123;</span><br><span class="line">      zone.<span class="title function_">run</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">value</span> = v;</span><br><span class="line">      &#125;);</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這會修正此問題。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

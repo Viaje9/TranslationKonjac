@@ -1,0 +1,249 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Angular 變更偵測的入門介紹 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/a-gentle-introduction-into-change-detection-in-angular
+Angular 變更檢測的入門介紹現代的網路應用程式是互動式的。應用程式的狀態可能隨時因按鈕點擊或伺服器返回的請求而改變。當狀態改變時，程式碼需要偵測到該變更並在使用者介面中反映出來。這是變更偵測機制的主要工作。
+
+如果你偏好觀看而不是閱讀，可以看看我在 AngularConnect 上發表的演講。
+
+過去一年，我寫了許多關於 Angular 中 change detection 機制的深入文章。它們提供了詳細的解釋並涵蓋了許多內部細節。但是，它們也需要花費大量時間才能仔細閱讀。對於那些沒有時間但仍然好奇的你來說：這篇文章提供了對變更偵測機制的「較輕鬆」的解釋。它將讓你對其組成部分和機制有一個高階的概述：用於表示元件的內部資料結構、綁定的作用以及作為該過程一部分執行的操作。我也會提到 zones，並確切地展示此功能如何在 Angular 中啟用自動變更偵測。
+當事情出錯時，了解變更偵測的內部運作原理將有助於你更有效率地除錯錯誤，例如 ExpressionChangedAfterItHasBeenCheckedError，並避免一些常見的混淆。在這篇文章中，我將演示幾個導致錯誤的設定，並使用它們來解釋變更偵測的內部運作原理。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="Angular 變更偵測的入門介紹"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">Angular 變更偵測的入門介紹</h1>
+  
+
+      
+        <time datetime="2025-01-04T08:33:14.000Z">2025-01-04</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/a-gentle-introduction-into-change-detection-in-angular">https://angular.love/a-gentle-introduction-into-change-detection-in-angular</a></p>
+<h1 id="Angular-變更檢測的入門介紹"><a href="#Angular-變更檢測的入門介紹" class="headerlink" title="Angular 變更檢測的入門介紹"></a>Angular 變更檢測的入門介紹</h1><p>現代的網路應用程式是互動式的。應用程式的狀態可能隨時因按鈕點擊或伺服器返回的請求而改變。當狀態改變時，程式碼需要偵測到該變更並在使用者介面中反映出來。<a target="_blank" rel="noopener" href="https://angular.love/en/what-every-front-end-developer-should-know-about-change-detection-in-angular-and-react/">這是變更偵測機制的主要工作</a>。</p>
+<blockquote>
+<p>如果你偏好觀看而不是閱讀，<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=DsBy9O0c6eo">可以看看我在 AngularConnect 上發表的演講</a>。</p>
+</blockquote>
+<p>過去一年，我寫了<a target="_blank" rel="noopener" href="https://angular.love/en/these-5-articles-will-make-you-an-angular-change-detection-expert/">許多關於 Angular 中 <strong>change detection</strong> 機制的深入文章</a>。它們提供了詳細的解釋並涵蓋了許多內部細節。但是，它們也需要花費大量時間才能仔細閱讀。對於那些沒有時間但仍然好奇的你來說：這篇文章提供了對變更偵測機制的「較輕鬆」的解釋。它將讓你對其組成部分和機制有一個高階的概述：用於表示元件的內部資料結構、綁定的作用以及作為該過程一部分執行的操作。我也會提到 zones，並確切地展示此功能如何在 Angular 中啟用自動變更偵測。</p>
+<p>當事情出錯時，了解變更偵測的內部運作原理將有助於你更有效率地除錯錯誤，例如 <a target="_blank" rel="noopener" href="https://angular.love/everything-you-need-to-know-about-the-expressionchangedafterithasbeencheckederror-error/"><code>ExpressionChangedAfterItHasBeenCheckedError</code></a>，並避免<a target="_blank" rel="noopener" href="https://angular.love/if-you-think-ngdocheck-means-your-component-is-being-checked-read-this-article/">一些常見的混淆</a>。在這篇文章中，我將演示幾個導致錯誤的設定，並使用它們來解釋變更偵測的內部運作原理。</p>
+<span id="more"></span>
+
+<h2 id="初次相遇"><a href="#初次相遇" class="headerlink" title="初次相遇"></a>初次相遇</h2><p>讓我們從這個簡單的 Angular 元件開始。它會在應用程式中發生變更偵測時，渲染當時的時間。時間戳記具有毫秒精度。點擊按鈕會觸發變更偵測：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image1-75.gif" alt="Image 25"></p>
+<p>這是實作方式：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">    <span class="attr">selector</span>: <span class="string">&#x27;my-app&#x27;</span>,</span><br><span class="line">    <span class="attr">template</span>: <span class="string">`</span></span><br><span class="line"><span class="string">        &lt;h3&gt;</span></span><br><span class="line"><span class="string">            Change detection is triggered at:</span></span><br><span class="line"><span class="string">            &lt;span [textContent]=&quot;time | date:&#x27;hh:mm:ss:SSS&#x27;&quot;&gt;&lt;/span&gt;</span></span><br><span class="line"><span class="string">        &lt;/h3&gt;</span></span><br><span class="line"><span class="string">        &lt;button (click)=&quot;0&quot;&gt;Trigger Change Detection&lt;/button&gt;</span></span><br><span class="line"><span class="string">    `</span></span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">    <span class="keyword">get</span> <span class="title function_">time</span>() &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如你所見，它相當基本。有一個名為 <code>time</code> 的 getter 會回傳目前的時間戳記。而且，我將它綁定到 HTML 中的 <code>span</code> 元素。</p>
+<blockquote>
+<p>Angular 不允許空表達式，所以我將 <code>0</code> 作為點擊回呼。</p>
+</blockquote>
+<p>你可以在<a target="_blank" rel="noopener" href="https://stackblitz.com/edit/angular-hqbenm?file=src/app/app.component.ts">這裡</a>使用它。當 Angular 執行變更偵測時，它會取得 <code>time</code> 屬性的值，透過 <code>date</code> pipe 傳遞它，並使用結果來更新 DOM。一切都如預期般運作。但是，當我檢查主控台時，我看到 <code>ExpressionChangedAfterItHasBeenCheckedError</code> 錯誤：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image2-362.png" alt="Image 26"></p>
+<p>這其實相當令人驚訝。通常，這個錯誤會出現在更複雜的實作中。那麼，我們如何能以如此簡單的功能得到它呢？別擔心，我們現在要來調查它。</p>
+<p>讓我們從錯誤訊息開始：</p>
+<blockquote>
+<p>Expression has changed after it was checked. Previous value: “textContent: 1542375826274”. Current value: “textContent: 1542375826275”.</p>
+</blockquote>
+<p>它告訴我們，<code>textContent</code> 綁定的表達式產生的值是不同的。是的，毫秒確實不同。因此，Angular 評估了表達式 <code>time | date:’hh:mm:ss:SSS</code> 兩次，並比較了結果。它偵測到差異，這就是導致錯誤的原因。</p>
+<p><strong>但是，為什麼 Angular 要執行該比較？</strong><br><strong>或者，它究竟何時執行？</strong></p>
+<p>這些問題激發了我的好奇心，並最終引導我深入研究變更偵測的內部運作原理。因為，為了找到這些問題的答案，我必須開始除錯。而我一直在除錯，除錯，嗯，我想它持續了大概…幾個月？讓我們從第二個問題開始，也就是錯誤何時被拋出。但首先，我需要與你分享我的一些發現，這將有助於我們理解我們剛才觀察到的行為。</p>
+<h2 id="元件視圖和綁定"><a href="#元件視圖和綁定" class="headerlink" title="元件視圖和綁定"></a>元件視圖和綁定</h2><p>Angular 中的變更偵測有兩個主要組成部分：</p>
+<ul>
+<li>元件視圖</li>
+<li>相關聯的綁定</li>
+</ul>
+<p>Angular 中的每個元件都有一個包含 HTML 元素的模板。當 Angular 建立 DOM 節點以在螢幕上渲染模板的內容時，它需要一個地方來儲存這些 DOM 節點的參考。為此，內部有一個稱為 View 的資料結構。它也用於儲存元件實例的參考和綁定表達式的先前值。元件和視圖之間存在一對一的關係。這是展示視圖的圖表：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image3-333.png" alt="Image 27"></p>
+<p>當編譯器分析模板時，它會識別出在變更偵測期間可能需要更新的 DOM 元素的屬性。對於每個這樣的屬性，編譯器都會建立一個 <strong>binding</strong>。綁定定義要更新的屬性名稱，以及 Angular 用於取得新值的表達式。</p>
+<p>在我們的案例中，屬性 <code>time</code> 用於屬性 <code>textContent</code> 的表達式中。因此，Angular 會建立一個綁定並將其與 <code>span</code> 元素關聯：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image4-274.png" alt="Image 28"></p>
+<blockquote>
+<p>在實際的實作中，綁定並不是一個包含所有必要資訊的單一物件。<code>viewDefinition</code> 定義了範本元素的實際綁定和要更新的屬性。用於綁定的表達式放置在 <code>updateRenderer</code> 函式中。</p>
+</blockquote>
+<h2 id="檢查元件視圖"><a href="#檢查元件視圖" class="headerlink" title="檢查元件視圖"></a>檢查元件視圖</h2><p>如你所知，在 Angular 中，會針對每個元件執行變更偵測。現在我們知道元件在內部被表示為視圖，我們可以說變更偵測是針對每個視圖執行的。</p>
+<p>當 Angular 檢查一個視圖時，它會簡單地執行編譯器為視圖產生的所有綁定。它會評估表達式並將其結果與儲存在視圖的 <code>oldValues</code> 陣列中的值進行比較。這就是髒檢查名稱的由來。如果它偵測到差異，它會更新與綁定相關的 DOM 屬性。它還需要將新值放入視圖的 <code>oldValues</code> 陣列中。就是這樣。你現在有了一個更新的使用者介面。一旦 Angular 完成檢查目前的元件，它會對子元件重複完全相同的步驟。</p>
+<p>在我們的應用程式中，在 <code>App</code> 元件中，只有一個對 <code>span</code> 元素的 <code>textContent</code> 屬性的綁定。因此，在變更偵測期間，Angular 會讀取元件的屬性 <code>time</code> 的值，套用 <code>date</code> pipe，並將其與儲存在視圖中的先前值進行比較。如果它偵測到差異，Angular 會更新 span 的 <code>textContent</code> 屬性和 <code>oldValues</code> 陣列。</p>
+<p><strong>但是，錯誤從何而來？</strong></p>
+<p>在每個變更偵測週期之後，在開發模式下，Angular 會 <strong>同步地</strong> 執行另一次檢查，以確保表達式產生與前一個變更偵測執行期間相同的值。此檢查不是原始變更偵測週期的一部分。它會在整個元件樹的檢查完成 <strong>之後</strong> 執行，並執行完全相同的步驟。但是，這次，當 Angular 偵測到差異時，它不會更新 DOM。相反，它會拋出 <code>ExpressionChangedAfterItHasBeenCheckedError</code>。</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image5-238.png" alt="Image 29"></p>
+<h2 id="原因"><a href="#原因" class="headerlink" title="原因"></a>原因</h2><p>所以現在我們知道錯誤何時被拋出。<strong>但是，為什麼 Angular 需要此檢查？</strong> 好吧，想像一下，在變更偵測執行期間，某些元件的屬性已被更新。結果，表達式會產生與使用者介面中呈現的不一致的新值。那麼，Angular 會做什麼？它當然可以執行另一個變更偵測週期，以將應用程式狀態與使用者介面同步。但是，如果在該過程中再次更新某些屬性會怎樣？看到模式了嗎？Angular 實際上可能會陷入無限的變更偵測執行迴圈。實際上，<a target="_blank" rel="noopener" href="https://docs.angularjs.org/error/$rootScope/infdig">這在 AngularJS 中經常發生</a>。</p>
+<p>為了避免這種情況，Angular 強加了所謂的<a target="_blank" rel="noopener" href="https://angular.love/en/do-you-really-know-what-unidirectional-data-flow-means-in-angular/">單向資料流</a>。而這個在變更偵測後執行的檢查以及導致的 <code>ExpressionChangedAfterItHasBeenCheckedError</code> 錯誤是強制機制。一旦 Angular 處理完目前元件的綁定，你就不再可以更新用於綁定表達式的元件屬性。</p>
+<h2 id="修正錯誤"><a href="#修正錯誤" class="headerlink" title="修正錯誤"></a>修正錯誤</h2><p>為了防止錯誤，我們需要確保在變更偵測執行期間和後續檢查中，表達式回傳的值相同。在我們的案例中，我們可以像這樣將評估部分移出 <code>time</code> getter：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">    _time;</span><br><span class="line">    <span class="keyword">get</span> <span class="title function_">time</span>() &#123;  <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">_time</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="title function_">constructor</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">_time</span> = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但是，使用此實作，getter <code>time</code> 的值將始終相同。我們仍然需要更新該值。我們稍早了解到，產生錯誤的檢查會在變更偵測週期後 <strong>同步</strong> 執行。因此，如果我們 <strong>非同步地</strong> 更新它，我們將避免錯誤。因此，為了每毫秒更新一次值，我們可以使用 <code>setInterval</code> 函式，並將延遲設定為 <code>1</code> 毫秒，如下所示：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">    _time;</span><br><span class="line">    <span class="keyword">get</span> <span class="title function_">time</span>() &#123;  <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">_time</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="title function_">constructor</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">_time</span> = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">        </span><br><span class="line">        <span class="built_in">setInterval</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">            <span class="variable language_">this</span>.<span class="property">_time</span> = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line">        &#125;, <span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>此實作解決了我們原先的問題。但是，不幸的是，它引入了一個新的問題。所有計時事件，例如 <code>setInterval</code>，都會在 Angular 中觸發變更偵測。這表示使用此實作，我們最終會陷入無限的變更偵測週期迴圈中。<strong>為了避免這種情況，我們需要一種方法來執行</strong> <code>setInterval</code> ****而不觸發變更偵測。****幸運的是，我們有辦法做到這一點。為了了解如何做到這一點，我們首先需要了解為什麼 <code>setInterval</code> 會在 Angular 中觸發變更偵測。</p>
+<h2 id="使用-zones-進行自動變更偵測"><a href="#使用-zones-進行自動變更偵測" class="headerlink" title="使用 zones 進行自動變更偵測"></a>使用 zones 進行自動變更偵測</h2><p>與 React 相反，Angular 中的變更偵測可以完全自動觸發，這是由於瀏覽器中的任何非同步事件所致。這是透過使用名為 <code>[**zone.js**](https://blog.angularindepth.com/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found-1f48dc87659b)</code> 的函式庫來實現的，該函式庫引入了 zones 的概念。與流行的觀點相反，zones 並不是 Angular 中變更偵測機制的一部分。事實上，<a target="_blank" rel="noopener" href="https://angular.love/en/do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular/">Angular 可以不用它們也能運作</a>。該函式庫只是提供了一種攔截非同步事件（例如 <code>setInterval</code>）並通知 Angular 的方法。根據該通知，Angular 會執行變更偵測。</p>
+<p>有趣的是，你可以在網頁上擁有許多不同的 zones。其中一個將是 <code>NgZone</code>。它是在 Angular 引導時建立的。這是 Angular 應用程式在其內部執行的 zone。而 Angular <strong>只會</strong> 收到在此 zone 內發生的事件的通知。</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image6-181.png" alt="Image 30"></p>
+<p>但是，<code>zone.js</code> 也提供了一個 API，可以在 Angular zone 以外的 zone 中執行一些程式碼。Angular 不會收到其他 zones 中發生的非同步事件的通知。沒有通知表示沒有變更偵測。執行此操作的方法名稱稱為 <code>runOutsideAngular</code>，它由 <code>NgZone</code> 服務實作。</p>
+<p>這是實作方法，它會注入 <code>NgZone</code> 並在 Angular zone 外部執行 <code>setInterval</code>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">    _time;</span><br><span class="line">    <span class="keyword">get</span> <span class="title function_">time</span>() &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">_time</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="title function_">constructor</span>(<span class="params"><span class="attr">zone</span>: <span class="title class_">NgZone</span></span>) &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">_time</span> = <span class="title class_">Date</span>.<span class="title function_">now</span>();</span><br><span class="line"></span><br><span class="line">        zone.<span class="title function_">runOutsideAngular</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">            <span class="built_in">setInterval</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">                <span class="variable language_">this</span>.<span class="property">_time</span> = <span class="title class_">Date</span>.<span class="title function_">now</span>()</span><br><span class="line">            &#125;, <span class="number">1</span>);</span><br><span class="line">        &#125;);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>現在我們不斷地更新時間，<em>但我們是以非同步方式並在 Angular zone 外部執行此操作。這保證了在變更偵測和後續檢查期間，getter <code>time</code> 會回傳相同的值。當 Angular 在下一個變更偵測週期中讀取 <code>time</code> 值時，該值將會被更新，並且變更將會反映在螢幕上。</em></p>
+<blockquote>
+<p>使用 NgZone 在 Angular 外部執行一些程式碼以避免觸發變更偵測是一種常見的優化技術。</p>
+</blockquote>
+<h2 id="除錯"><a href="#除錯" class="headerlink" title="除錯"></a>除錯</h2><p>你可能想知道是否有任何方法可以在 Angular 內部查看此視圖和綁定。事實上，有。在 <code>[**@angular/core**](https://github.com/maximusk/angular/blob/24cf8b326918e0694dfcdcf48635b5325060827a/packages/core/src/view/view.ts#L350)</code> <a target="_blank" rel="noopener" href="https://github.com/maximusk/angular/blob/24cf8b326918e0694dfcdcf48635b5325060827a/packages/core/src/view/view.ts#L350">模組</a>中，有一個名為 <code>checkAndUpdateView</code> 的函式<a target="_blank" rel="noopener" href="https://github.com/maximusk/angular/blob/24cf8b326918e0694dfcdcf48635b5325060827a/packages/core/src/view/view.ts#L350">。</a> 它會執行元件樹中的每個視圖（元件），並對每個視圖執行檢查。當我遇到變更偵測問題時，我總是會開始除錯此函式。</p>
+<p>試著自己除錯它。前往<a target="_blank" rel="noopener" href="https://angular-eobrrh.stackblitz.io/">這個 stackblitz 示範應用程式</a>，然後開啟主控台。找到該函式並在那裡設定中斷點。點擊按鈕以觸發變更偵測。檢查 <code>view</code> 變數。這是我執行此操作的錄製：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image7-33.gif" alt="Image 31"></p>
+<p>第一個 <code>view</code> 將是主機視圖。它是 Angular 建立的用於託管我們的應用程式元件的某種根元件。我們需要繼續執行以到達它的子視圖，這將是為我們的 <code>AppComponent</code> 建立的視圖。<strong>探索它</strong>。<code>component</code> 屬性會保留對 <code>App</code> 元件實例的參考。<code>nodes</code> 屬性會保留對為 <code>App</code> 元件範本中的元素建立的 DOM 節點的參考。<code>oldValues</code> 陣列會儲存綁定表達式的結果。</p>
+<h2 id="運算順序"><a href="#運算順序" class="headerlink" title="運算順序"></a>運算順序</h2><p>我們剛剛了解到，由於單向資料流限制，你不能在檢查元件後，在變更偵測期間變更元件的某些屬性。最常見的情況是，當 Angular 對子元件執行變更偵測時，此更新是透過共用服務或同步事件廣播來進行的。但是，也可以將父元件直接注入到子元件中，並在生命週期鉤子中更新父元件狀態。以下是一些演示此操作的程式碼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">    <span class="attr">selector</span>: <span class="string">&#x27;my-app&#x27;</span>,</span><br><span class="line">    <span class="attr">template</span>: <span class="string">`</span></span><br><span class="line"><span class="string">        &lt;div [textContent]=&quot;text&quot;&gt;&lt;/div&gt;</span></span><br><span class="line"><span class="string">        &lt;child-comp&gt;&lt;/child-comp&gt;</span></span><br><span class="line"><span class="string">    `</span></span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span> &#123;</span><br><span class="line">    text = <span class="string">&#x27;Original text in parent component&#x27;</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Component</span>(&#123;</span><br><span class="line">    <span class="attr">selector</span>: <span class="string">&#x27;child-comp&#x27;</span>,</span><br><span class="line">    <span class="attr">template</span>: <span class="string">`&lt;span&gt;I am child component&lt;/span&gt;`</span></span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ChildComponent</span> &#123;</span><br><span class="line">    <span class="title function_">constructor</span>(<span class="params"><span class="keyword">private</span> <span class="attr">parent</span>: <span class="title class_">AppComponent</span></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="title function_">ngAfterViewChecked</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">parent</span>.<span class="property">text</span> = <span class="string">&#x27;Updated text in parent component&#x27;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>你可以在<a target="_blank" rel="noopener" href="https://stackblitz.com/edit/angular-zntusy">這裡</a>使用它。基本上，我們定義了兩個元件的簡單階層。父元件宣告了用於綁定的 <code>text</code> 屬性。子元件將父元件注入建構函式中，並在其 <code>ngAfterViewChecked</code> 生命周期鉤子中更新其屬性。你能猜到我們會在主控台中看到什麼嗎？?</p>
+<p>沒錯，是熟悉的 <code>ExpressionChangedAfterItWasChecked</code> 錯誤。這是因為當 Angular 為子元件呼叫 <code>ngAfterViewChecked</code> 生命周期鉤子時，它已經檢查過父 <code>App</code> 元件的綁定。但是在檢查之後，我們會更新綁定中使用的父元件的屬性 <code>text</code>。</p>
+<p>但是，有趣的部分來了。如果我現在變更鉤子會怎樣？比如說，改成 <code>ngOnInit</code>。你認為我們還會看到錯誤嗎？</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ChildComponent</span> &#123;</span><br><span class="line">    <span class="title function_">constructor</span>(<span class="params"><span class="keyword">private</span> <span class="attr">parent</span>: <span class="title class_">AppComponent</span></span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="title function_">ngOnInit</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">parent</span>.<span class="property">text</span> = <span class="string">&#x27;Updated text in parent component&#x27;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>嗯，這次它不在那裡。</strong> <a target="_blank" rel="noopener" href="https://stackblitz.com/edit/angular-ti5abu">檢查演示</a>。事實上，我們可以將程式碼放入任何其他鉤子中（除了 <code>AfterViewInit</code> 和 <code>AfterViewChecked</code>），而且我們不會在主控台中看到錯誤。那麼這裡發生了什麼事？為什麼 <code>ngAfterViewChecked</code> 鉤子很特別？</p>
+<p>為了理解此行為，我們需要知道 Angular 在變更偵測期間執行的操作及其順序。而且，我們已經知道可以在哪裡找到它們：我先前向你展示的 <code>checkAndUpdateView</code> 函式。以下是你在函式主體中可以找到的部分程式碼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">checkAndUpdateView</span>(<span class="params">view, ...</span>) &#123;</span><br><span class="line">    ...       </span><br><span class="line">    <span class="comment">// update input bindings on child views (components) &amp; directives,</span></span><br><span class="line">    <span class="comment">// call NgOnInit, NgDoCheck and ngOnChanges hooks if needed</span></span><br><span class="line">    <span class="title class_">Services</span>.<span class="title function_">updateDirectives</span>(view, <span class="title class_">CheckType</span>.<span class="property">CheckAndUpdate</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// DOM updates, perform rendering for the current view (component)</span></span><br><span class="line">    <span class="title class_">Services</span>.<span class="title function_">updateRenderer</span>(view, <span class="title class_">CheckType</span>.<span class="property">CheckAndUpdate</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// run change detection on child views (components)</span></span><br><span class="line">    <span class="title function_">execComponentViewsAction</span>(view, <span class="title class_">ViewAction</span>.<span class="property">CheckAndUpdate</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// call AfterViewChecked and AfterViewInit hooks</span></span><br><span class="line">    <span class="title function_">callLifecycleHooksChildrenFirst</span>(…, <span class="title class_">NodeFlags</span>.<span class="property">AfterViewChecked</span>…);</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如你所見，Angular 還會在變更偵測過程中觸發生命週期鉤子。****有趣的是，某些鉤子是在 Angular 處理綁定時的渲染部分之前呼叫，而某些鉤子是在渲染部分之後呼叫。****這是展示當 Angular 為父元件執行變更偵測時會發生什麼的圖表：</p>
+<p><img src="https://wp.angular.love/wp-content/uploads/2024/07/content-image8-141.png"></p>
+<p>讓我們逐步了解它。首先，它會更新 <strong>子</strong> 元件的輸入綁定。然後，它會在 <strong>子</strong> 元件上呼叫 <code>OnInit</code>、<code>DoCheck</code> 和 <code>OnChanges</code> 鉤子。這是有道理的，因為它剛剛更新了輸入綁定，並且 Angular 需要通知子元件輸入綁定已初始化。<strong>然後，Angular 會對目前元件執行渲染。</strong> 之後，它會對子元件執行變更偵測。這表示它基本上會對子視圖重複這些操作。最後，它會在 <strong>子</strong> 元件上呼叫 <code>AfterViewChecked</code> 和 <code>AfterViewInit</code> 鉤子，以告知它已被檢查。</p>
+<p>我們在這裡可以注意到的是，Angular 會在處理父元件的綁定 <strong>之後</strong>，為子元件 <strong>呼叫</strong> <code>AfterViewChecked</code> 生命週期鉤子。另一方面，<code>OnInit</code> <strong>鉤子是在</strong> 處理綁定 <strong>之前</strong> 呼叫。因此，即使 <code>OnInit</code> 中的 <code>text</code> 值發生變更，在後續檢查期間它仍然會相同。這就解釋了在 <code>ngOnInit</code> 鉤子中沒有錯誤的看似怪異的行為。謎團解開了 ?。</p>
+<h2 id="總結"><a href="#總結" class="headerlink" title="總結"></a>總結</h2><p>好的，現在讓我們總結一下我們剛剛學到的內容。Angular 中的所有元件在內部都以稱為視圖的資料結構表示。Angular 的編譯器會解析範本並建立綁定。每個綁定都會定義要更新的 DOM 元素的屬性，以及用於取得值的表達式。在變更偵測期間用於比較的先前值會儲存在視圖的 <code>oldValues</code> 屬性中。在變更偵測期間，Angular 會執行綁定、評估表達式、將它們與先前的值進行比較，並在必要時更新 DOM。在每個變更偵測週期之後，Angular 會執行檢查，以確保元件狀態與使用者介面同步。此檢查會同步執行，並且可能會拋出 <code>ExpressionChangedAfterItWasChecked</code> 錯誤。</p>
+<h3 id="我們學到了很多！我希望這些知識能喚醒你的好奇心。你接下來該做什麼？"><a href="#我們學到了很多！我希望這些知識能喚醒你的好奇心。你接下來該做什麼？" class="headerlink" title="我們學到了很多！我希望這些知識能喚醒你的好奇心。你接下來該做什麼？"></a>我們學到了很多！我希望這些知識能喚醒你的好奇心。你接下來該做什麼？</h3><p><strong><a target="_blank" rel="noopener" href="https://angular.love/en/these-5-articles-will-make-you-an-angular-change-detection-expert/">這 5 篇文章會讓你成為 Angular 變更偵測專家</a></strong></p>
+<p>如果你正在尋找關於 Angular 中變更偵測的更深入解釋，本文是一個很好的起點。它是一系列深入探討變更偵測主題的文章，例如 zones、DOM 更新機制、單向資料流和 <code>ExpressionChangedAfterItWasChecked</code> 錯誤。</p>
+<p><strong><a target="_blank" rel="noopener" href="https://angular.love/en/level-up-your-reverse-engineering-skills/">提升你的逆向工程技能</a></strong></p>
+<p>我今天與你分享的大部分內容都是透過逆向工程發現的。對我來說，這是學習最有價值的方式，但它可能是最具挑戰性的。本文總結了我的逆向工程經驗，並概述了一些有助於你開始自行探索來源的指南和原則。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

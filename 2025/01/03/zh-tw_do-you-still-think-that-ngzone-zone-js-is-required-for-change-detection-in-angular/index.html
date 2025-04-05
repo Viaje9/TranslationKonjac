@@ -1,0 +1,218 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Do you still think that NgZone (zone.js) is required for change detection in Angular? › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular
+Angular 中的變更偵測是否仍然需要 NgZone (zone.js)？我看到的大部分文章都強烈地將 Zone (zone.js) 和 NgZone 與 Angular 中的變更偵測聯繫起來。雖然它們確實相關，但嚴格來說它們並不是一個整體的一部分。是的，Zone 和 NgZone 用於自動觸發非同步操作所導致的變更偵測。但是，由於變更偵測是一個獨立的機制，它可以成功地在沒有 Zone 和 NgZone 的情況下工作。在第一章中，我將展示如何在沒有 zone.js 的情況下使用 Angular。本文的第二部分解釋了 Angular 和 zone.js 如何透過 NgZone 相互作用。最後，我還會說明為什麼自動變更偵測有時在使用 Google API Client Library (gapi) 等第三方函式庫時不起作用。
+我寫過許多關於 Angular 中變更偵測的深入文章，而這篇文章完善了這個概念。如果你正在尋找關於變更偵測如何運作的全面概述，我建議你閱讀所有文章，從這篇開始 這 5 篇文章將讓你成為 Angular 變更偵測專家。****請注意，本文不是關於 Zones (zone.js)，而是關於 Angular 如何在 NgZone 的實作中使用 Zones 以及它與變更偵測機制的關係。****要了解更多關於 Zones 的資訊，請閱讀 我對 Zones (zone.js) 進行了逆向工程，這是我發現的。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="Do you still think that NgZone (zone.js) is required for change detection in Angular?"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">Do you still think that NgZone (zone.js) is required for change detection in Angular?</h1>
+  
+
+      
+        <time datetime="2025-01-03T02:57:14.000Z">2025-01-03</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular">https://angular.love/do-you-still-think-that-ngzone-zone-js-is-required-for-change-detection-in-angular</a></p>
+<h1 id="Angular-中的變更偵測是否仍然需要-NgZone-zone-js-？"><a href="#Angular-中的變更偵測是否仍然需要-NgZone-zone-js-？" class="headerlink" title="Angular 中的變更偵測是否仍然需要 NgZone (zone.js)？"></a>Angular 中的變更偵測是否仍然需要 NgZone (zone.js)？</h1><p>我看到的大部分文章都強烈地將 <code>Zone</code> (<code>zone.js</code>) 和 <code>NgZone</code> 與 Angular 中的變更偵測聯繫起來。雖然它們確實相關，但嚴格來說它們並不是一個整體的一部分。是的，<code>Zone</code> 和 <code>NgZone</code> 用於自動觸發非同步操作所導致的變更偵測。但是，由於變更偵測是一個獨立的機制，它可以成功地在沒有 <code>Zone</code> 和 <code>NgZone</code> 的情況下工作。在第一章中，我將展示如何在沒有 <code>zone.js</code> 的情況下使用 Angular。本文的第二部分解釋了 Angular 和 zone.js 如何透過 <code>NgZone</code> 相互作用。最後，我還會說明為什麼自動變更偵測有時在使用 <a target="_blank" rel="noopener" href="https://developers.google.com/api-client-library/">Google API Client Library</a> (gapi) 等第三方函式庫時不起作用。</p>
+<p>我寫過許多關於 Angular 中變更偵測的深入文章，而這篇文章完善了這個概念。如果你正在尋找關於變更偵測如何運作的全面概述，我建議你閱讀所有文章，從這篇開始 <a target="_blank" rel="noopener" href="https://angular.love/these-5-articles-will-make-you-an-angular-change-detection-expert/">這 5 篇文章將讓你成為 Angular 變更偵測專家</a>。****請注意，本文不是關於 Zones (zone.js)，而是關於 Angular 如何在 NgZone 的實作中使用 Zones 以及它與變更偵測機制的關係。****要了解更多關於 Zones 的資訊，請閱讀 <a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">我對 Zones (zone.js) 進行了逆向工程，這是我發現的</a>。</p>
+<span id="more"></span>
+
+<h2 id="在沒有-Zone-zone-js-的情況下使用-Angular"><a href="#在沒有-Zone-zone-js-的情況下使用-Angular" class="headerlink" title="在沒有 Zone (zone.js) 的情況下使用 Angular"></a>在沒有 Zone (zone.js) 的情況下使用 Angular</h2><p>為了證明 Angular 可以在沒有 Zone 的情況下成功運作，我最初計劃提供一個什麼都不做的模擬 Zone 物件。但即將推出的 Angular 版本 5 為我簡化了操作。它現在 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/commit/344a5ca">提供了一種方法</a> 來使用一個 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/30d5a2ca83c9cf44f602462597a58547b05b75dd/packages/core/src/zone/ng_zone.ts#L318">noop Zone</a> ，該 Zone 不會透過設定執行任何操作。</p>
+<p>為此，我們先移除對 <code>zone.js</code> 的依賴。我將使用 stackblitz 來展示應用程式，由於它使用 Angular-CLI，我將從 <code>polyfils.ts</code> 檔案中移除以下導入：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* Zone JS 是 Angular 本身所需的。 */</span></span><br><span class="line"><span class="keyword">import</span> <span class="string">&#x27;zone.js/dist/zone&#x27;</span>;  <span class="comment">// 包含在 Angular CLI 中。</span></span><br></pre></td></tr></table></figure>
+
+<p>之後，我將設定 Angular 以使用 noop Zone 實作，如下所示：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">platformBrowserDynamic</span>()</span><br><span class="line">    .<span class="title function_">bootstrapModule</span>(<span class="title class_">AppModule</span>, &#123;</span><br><span class="line">        <span class="attr">ngZone</span>: <span class="string">&#x27;noop&#x27;</span></span><br><span class="line">    &#125;);</span><br></pre></td></tr></table></figure>
+
+<p>如果你現在 <a target="_blank" rel="noopener" href="https://stackblitz.com/edit/angular-jmlwb7">執行應用程式</a>，你會看到變更偵測已完全運作，並在 DOM 中呈現 <code>name</code> 元件屬性。</p>
+<p>現在，如果我們使用 <code>setTimeout</code> 更新此屬性：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span>  &#123;</span><br><span class="line">    name = <span class="string">&#x27;Angular 4&#x27;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="title function_">constructor</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">            <span class="variable language_">this</span>.<span class="property">name</span> = <span class="string">&#x27;updated&#x27;</span>;</span><br><span class="line">        &#125;, <span class="number">1000</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>你會看到變更沒有更新。這是預期的，因為沒有使用 <code>NgZone</code>，因此不會自動觸發變更偵測。但是，如果我們手動觸發它，它仍然可以正常工作。這可以透過注入 <a target="_blank" rel="noopener" href="https://angular.io/api/core/ApplicationRef">ApplicationRef</a> 並觸發 <code>tick</code> 方法來啟動變更偵測來完成：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">AppComponent</span>  &#123;</span><br><span class="line">    name = <span class="string">&#x27;Angular 4&#x27;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="title function_">constructor</span>(<span class="params"><span class="attr">app</span>: <span class="title class_">ApplicationRef</span></span>) &#123;</span><br><span class="line">        <span class="built_in">setTimeout</span>(<span class="function">()=&gt;</span>&#123;</span><br><span class="line">            <span class="variable language_">this</span>.<span class="property">name</span> = <span class="string">&#x27;updated&#x27;</span>;</span><br><span class="line">            app.<span class="title function_">tick</span>();</span><br><span class="line">        &#125;, <span class="number">1000</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>現在你可以看到 <a target="_blank" rel="noopener" href="https://stackblitz.com/edit/angular-lr1rss">更新已成功呈現</a>。</p>
+<p>總之，上述示範的重點是向你展示 <code>zone.js</code>，尤其是 <code>NgZone</code>，並不是變更偵測實作的一部分。它是一種<strong>非常方便</strong>的機制，可以透過呼叫 <code>app.tick()</code> 來自動觸發變更偵測，而不是在某些點手動執行。我們將在一分鐘內看到這些點是什麼。</p>
+<h2 id="NgZone-如何使用-Zones"><a href="#NgZone-如何使用-Zones" class="headerlink" title="NgZone 如何使用 Zones"></a>NgZone 如何使用 Zones</h2><p>在我的 <a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">先前關於 Zone (zone.js) 的文章</a> 中，我深入描述了 Zone 提供的內部運作和 API。我在那裡解釋了 <a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">forking a zone</a> 和 <a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">在特定 zone 中執行任務</a> 的核心概念。我將在此處引用這些概念。</p>
+<p>我也展示了 Zone 提供的兩種能力 — <a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">context propagation</a> 和出色的 <a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">非同步任務追蹤</a>。Angular 實作了 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/30d5a2ca83c9cf44f602462597a58547b05b75dd/packages/core/src/zone/ng_zone.ts#L86">NgZone</a> 類別，該類別嚴重依賴任務追蹤機制。</p>
+<p>NgZone 只是 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/30d5a2ca83c9cf44f602462597a58547b05b75dd/packages/core/src/zone/ng_zone.ts#L252">forked 子 zone</a> 的包裝：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">forkInnerZoneWithAngularBehavior</span>(<span class="params"><span class="attr">zone</span>: <span class="title class_">NgZonePrivate</span></span>) &#123;</span><br><span class="line">    zone.<span class="property">_inner</span> = zone.<span class="property">_inner</span>.<span class="title function_">fork</span>(&#123;</span><br><span class="line">        <span class="attr">name</span>: <span class="string">&#x27;angular&#x27;</span>,</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+
+<p>forked zone 保存在 <code>_inner</code> 屬性中，通常稱為 Angular zone。當你執行 <code>NgZone.run()</code> 時，這個 zone 用於執行回呼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">run</span>(<span class="params">fn, applyThis, applyArgs</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">_inner</span>.<span class="title function_">run</span>(fn, applyThis, applyArgs);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在 forking Angular zone 時的目前 zone 保存在 <code>_outer</code> 屬性中，當你執行 <code>NgZone.runOutsideAngular()</code> 時，它用於執行回呼：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">runOutsideAngular</span>(<span class="params">fn</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">_outer</span>.<span class="title function_">run</span>(fn);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這個方法通常用於在 Angular zone 之外執行效能密集型操作，以避免不斷地 <a target="_blank" rel="noopener" href="https://angular.love/these-5-articles-will-make-you-an-angular-change-detection-expert/">觸發變更偵測</a>。</p>
+<p>NgZone 具有 <code>isStable</code> 屬性，表示沒有未完成的微任務或巨任務。它還定義了四個事件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">+------------------+-------------------------------------------------------+</span><br><span class="line">|      事件         |                     描述                               </span><br><span class="line">+------------------+-------------------------------------------------------+</span><br><span class="line">| onUnstable       | 當程式碼進入 Angular Zone 時發出通知。                     </span><br><span class="line">|                  | 這會在 VM Turn 上首先觸發。                               </span><br><span class="line">|                  |                                                        </span><br><span class="line">| onMicrotaskEmpty | 當目前 VM Turn 中沒有更多微任務排隊時發出通知。               </span><br><span class="line">|                  | 這是 Angular 進行變更偵測的提示，可能會使更多微任務排隊。      </span><br><span class="line">|                  | 因此，這個事件可能會在每個 VM Turn 中觸發多次。              </span><br><span class="line">|                  |                                                        </span><br><span class="line">| onStable         | 當最後一次 `onMicrotaskEmpty` 執行且沒有更多微任務時發出通知， </span><br><span class="line">|                  | 這表示我們即將放棄 VM Turn。                              </span><br><span class="line">|                  | 這個事件只會被呼叫一次。                                   </span><br><span class="line">|                  |                                                        </span><br><span class="line">| onError          | 發出已傳遞錯誤的通知。                 ㅤ                  </span><br><span class="line">+------------------+-------------------------------------------------------+</span><br></pre></td></tr></table></figure>
+
+<p>Angular 在 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/30d5a2ca83c9cf44f602462597a58547b05b75dd/packages/core/src/application_ref.ts#L364">ApplicationRef</a> 內部使用 <code>onMicrotaskEmpty</code> 事件來自動觸發變更偵測：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable language_">this</span>.<span class="property">_zone</span>.<span class="property">onMicrotaskEmpty</span>.<span class="title function_">subscribe</span>(</span><br><span class="line">    &#123;<span class="attr">next</span>: <span class="function">() =&gt;</span> &#123; <span class="variable language_">this</span>.<span class="property">_zone</span>.<span class="title function_">run</span>(<span class="function">() =&gt;</span> &#123; <span class="variable language_">this</span>.<span class="title function_">tick</span>(); &#125;); &#125;&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>如果你還記得上一節的內容，<code>tick()</code> 方法用於執行應用程式的變更偵測。</p>
+<h2 id="NgZone-如何實作-onMicrotaskEmpty-事件"><a href="#NgZone-如何實作-onMicrotaskEmpty-事件" class="headerlink" title="NgZone 如何實作 onMicrotaskEmpty 事件"></a>NgZone 如何實作 onMicrotaskEmpty 事件</h2><p>現在讓我們看看 <code>NgZone</code> 如何實作 <code>onMicrotaskEmpty</code> 事件。該事件從 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/30d5a2ca83c9cf44f602462597a58547b05b75dd/packages/core/src/zone/ng_zone.ts#L233">checkStable</a> 函數發出：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">checkStable</span>(<span class="params"><span class="attr">zone</span>: <span class="title class_">NgZonePrivate</span></span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (zone.<span class="property">_nesting</span> == <span class="number">0</span> &amp;&amp; !zone.<span class="property">hasPendingMicrotasks</span> &amp;&amp; !zone.<span class="property">isStable</span>) &#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">      zone.<span class="property">_nesting</span>++;</span><br><span class="line">      zone.<span class="property">onMicrotaskEmpty</span>.<span class="title function_">emit</span>(<span class="literal">null</span>); <span class="language-xml">&lt;-------------------</span></span><br></pre></td></tr></table></figure>
+
+<p>這個函數會定期從三個 Zone hooks 觸發：</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">onHasTask</a></li>
+<li><a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">onInvokeTask</a></li>
+<li><a target="_blank" rel="noopener" href="https://angular.love/i-reverse-engineered-zones-zone-js-and-here-is-what-ive-found/">onInvoke</a></li>
+</ul>
+<p>正如關於 Zones 的文章中所解釋的，當觸發最後兩個 hook 時，微任務佇列中可能會發生變更，因此 Angular 每次觸發 hook 時都必須執行 <code>stable</code> 檢查。 <code>onHasTask</code> hook 也用於執行檢查，因為它可以追蹤整個佇列變更。</p>
+<h2 id="常見的陷阱"><a href="#常見的陷阱" class="headerlink" title="常見的陷阱"></a>常見的陷阱</h2><p>在 stackoveflow 上，與變更偵測相關的最常見問題之一是為什麼有時在使用第三方函式庫時，元件中的變更不會套用。這裡有一個 <a target="_blank" rel="noopener" href="https://stackoverflow.com/a/46286400/2545680">此類問題的範例</a>，其中涉及 <a target="_blank" rel="noopener" href="https://developers.google.com/api-client-library/">Google API Client Library</a> (gapi)。解決此類問題的常見方法是簡單地在 Angular zone 內執行回呼，如下所示：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">gapi.<span class="title function_">load</span>(<span class="string">&#x27;auth2&#x27;</span>, <span class="function">() =&gt;</span> &#123;</span><br><span class="line">    zone.<span class="title function_">run</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+
+<p>然而，一個有趣的問題是，為什麼 Zone <strong>不</strong>註冊請求，導致在其中一個 hook 中<strong>沒有</strong>通知？而且沒有通知，<code>NgZone</code> 不會自動觸發變更偵測。</p>
+<p>為了瞭解這一點，我深入研究了 <code>gapi</code> 的 <strong>縮小</strong>原始碼，發現它使用 <a target="_blank" rel="noopener" href="http://schock.net/articles/2013/02/05/how-jsonp-really-works-examples/">JSONP</a> 發出網路請求。這種方法不使用常見的 AJAX API，例如 <a target="_blank" rel="noopener" href="https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest">XMLHttpRequest</a> 或 <a target="_blank" rel="noopener" href="https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API">Fetch API</a>，這些 API 由 Zones 修補和追蹤。相反，它會建立一個帶有源 URL 的 <code>script</code> 標籤，並定義一個全域回呼，以便在從伺服器取得請求的帶有資料的腳本時觸發。Zones 無法修補或偵測到這種情況，因此框架仍然無法知道使用此技術執行的請求。</p>
+<p>以下是來自 <a target="_blank" rel="noopener" href="https://apis.google.com/js/api.js">gapi 縮小版本</a> 的相關程式碼片段，以供好奇的人參考：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="title class_">Ja</span> = <span class="keyword">function</span>(<span class="params">a</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> b = L.<span class="title function_">createElement</span>(Z);</span><br><span class="line">    b.<span class="title function_">setAttribute</span>(“src”, a);</span><br><span class="line">    a = <span class="title class_">Ia</span>();</span><br><span class="line">    <span class="literal">null</span> !== a &amp;&amp; b.<span class="title function_">setAttribute</span>(“nonce”, a);</span><br><span class="line">    b.<span class="property">async</span> = “<span class="literal">true</span>”;</span><br><span class="line">    (a = L.<span class="title function_">getElementsByTagName</span>(Z)[<span class="number">0</span>]) ? </span><br><span class="line">        a.<span class="property">parentNode</span>.<span class="title function_">insertBefore</span>(b, a) : </span><br><span class="line">        (L.<span class="property">head</span> || L.<span class="property">body</span> || L.<span class="property">documentElement</span>).<span class="title function_">appendChild</span>(b)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>Z</code> 變數等於 <code>&quot;script&quot;</code>，而參數 <code>a</code> 保存請求 URL：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">https</span>:<span class="comment">//apis.google.com/_.../cb=gapi.loaded_0</span></span><br></pre></td></tr></table></figure>
+
+<p>URL 的最後一段是 <code>gapi.loaded_0</code> 全域回呼：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typeof</span> gapi.<span class="property">loaded_0</span> </span><br><span class="line">“<span class="keyword">function</span>”</span><br></pre></td></tr></table></figure>
+
+<p><strong>就這樣。感謝閱讀！</strong></p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+

@@ -1,0 +1,249 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Angular 中 DOM 更新的機制 › 翻譯蒟蒻</title>
+  <meta name="author" content="Brian">
+  
+  <meta name="description" content="原文：https://angular.love/the-mechanics-of-dom-updates-in-angular
+Angular 中 DOM 更新的機制由模型變更觸發的 DOM 更新是所有現代前端框架的關鍵功能，Angular 也不例外。 我們只需指定像這樣的表達式：
+1&amp;lt;span&amp;gt;Hello &amp;#123;&amp;#123;name&amp;#125;&amp;#125;&amp;lt;/span&amp;gt;
+
+或像這樣的綁定：
+1&amp;lt;span [textContent]=&amp;quot;&amp;#x27;Hello &amp;#x27; + name&amp;quot;&amp;gt;&amp;lt;/span&amp;gt;
+
+每當 name 屬性變更時，Angular 就會神奇地更新 DOM。 從表面上看來這似乎很容易，但實際上內部是一個相當複雜的過程。 DOM 更新是 Angular 變更偵測機制的一部分，主要由三個主要操作組成：
+
+DOM 更新
+子元件 Input 綁定更新
+查詢列表更新
+
+本文探討了變更偵測的渲染部分是如何運作的。 如果你曾經想知道這是如何實現的，請繼續閱讀並獲得啟發。 在參考來源時，我假設應用程式正在生產模式下執行。 讓我們開始吧。">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="Angular 中 DOM 更新的機制"/>
+  <meta property="og:site_name" content="翻譯蒟蒻"/>
+
+  
+    <meta property="og:image" content=""/>
+  
+
+  <link href="/TranslationKonjac/favicon.png" rel="icon">
+  <link rel="alternate" href="/TranslationKonjac/atom.xml" title="翻譯蒟蒻" type="application/atom+xml">
+  <link rel="stylesheet" href="/TranslationKonjac/css/style.css" media="screen" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  <header id="header"><div class="meta inner">
+  <h1><a href="/TranslationKonjac/">翻譯蒟蒻</a></h1>
+  <h2><a href="/TranslationKonjac/"></a></h2>
+  <nav id="main-nav">
+    <ul>
+      
+    </ul>
+    <div class="clearfix"></div>
+  </nav>
+</div>
+<div class="clearfix"></div>
+</header>
+  <div id="content" class="inner">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
+  <div class="post-content">
+    <header>
+      
+  
+    <h1 class="title">Angular 中 DOM 更新的機制</h1>
+  
+
+      
+        <time datetime="2025-01-04T09:10:03.000Z">2025-01-04</time>
+      
+    </header>
+    <div class="entry">
+      
+        <p>原文：<a target="_blank" rel="noopener" href="https://angular.love/the-mechanics-of-dom-updates-in-angular">https://angular.love/the-mechanics-of-dom-updates-in-angular</a></p>
+<h1 id="Angular-中-DOM-更新的機制"><a href="#Angular-中-DOM-更新的機制" class="headerlink" title="Angular 中 DOM 更新的機制"></a>Angular 中 DOM 更新的機制</h1><p>由模型變更觸發的 DOM 更新是所有現代前端框架的關鍵功能，Angular 也不例外。 我們只需指定像這樣的表達式：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">span</span>&gt;</span>Hello &#123;&#123;name&#125;&#125;<span class="tag">&lt;/<span class="name">span</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>或像這樣的綁定：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">span</span> [<span class="attr">textContent</span>]=<span class="string">&quot;&#x27;Hello &#x27; + name&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">span</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>每當 <code>name</code> 屬性變更時，Angular 就會神奇地更新 DOM。 從表面上看來這似乎很容易，但實際上內部是一個相當複雜的過程。 DOM 更新是 Angular <a target="_blank" rel="noopener" href="https://angular.love/en/everything-you-need-to-know-about-change-detection-in-angular/">變更偵測機制</a>的一部分，主要由三個主要操作組成：</p>
+<ul>
+<li>DOM 更新</li>
+<li>子元件 <code>Input</code> 綁定更新</li>
+<li>查詢列表更新</li>
+</ul>
+<p>本文探討了變更偵測的渲染部分是如何運作的。 如果你曾經想知道這是如何實現的，請繼續閱讀並獲得啟發。 在參考來源時，我假設應用程式正在生產模式下執行。 讓我們開始吧。</p>
+<span id="more"></span>
+
+<h2 id="應用程式內部表示"><a href="#應用程式內部表示" class="headerlink" title="應用程式內部表示"></a>應用程式內部表示</h2><p>在我們可以開始探索 Angular DOM 更新功能之前，我們需要先了解 Angular 應用程式在底層是如何表示的。 讓我們簡單回顧一下。</p>
+<h3 id="視圖-View"><a href="#視圖-View" class="headerlink" title="視圖 (View)"></a>視圖 (View)</h3><p>你可能<a target="_blank" rel="noopener" href="https://angular.love/en/here-is-what-you-need-to-know-about-dynamic-components-in-angular/">從我的其他文章</a>中了解到，對於應用程式中使用的每個元件，Angular 編譯器都會產生一個 <strong><strong>工廠</strong></strong>。 當 Angular 從工廠建立元件時，例如像這樣：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> factory = r.<span class="title function_">resolveComponentFactory</span>(<span class="title class_">AComponent</span>);</span><br><span class="line">factory.<span class="title function_">create</span>(injector);</span><br></pre></td></tr></table></figure>
+
+<p>Angular 使用此工廠來實例化 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/types.ts#L48">視圖定義 (View Definition)</a>，而視圖定義又用於<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/view.ts#L217">建立元件視圖 (View)</a>。 <strong><strong>在底層，Angular 將應用程式表示為視圖樹</strong></strong>。 每個元件類型只有一個視圖定義的實例，它作為所有視圖的模板。 但是對於每個元件實例，Angular 都會建立一個單獨的視圖。</p>
+<h3 id="工廠-Factory"><a href="#工廠-Factory" class="headerlink" title="工廠 (Factory)"></a>工廠 (Factory)</h3><p>元件工廠主要由編譯器在解析範本後產生的視圖節點組成。 假設你像這樣定義元件的範本：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">span</span>&gt;</span>I am &#123;&#123;name&#125;&#125;<span class="tag">&lt;/<span class="name">span</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>使用此資料，編譯器會產生以下元件工廠：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">View_AComponent_0</span>(<span class="params">l</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="title function_">jit_viewDef1</span>(<span class="number">0</span>,</span><br><span class="line">        [</span><br><span class="line">          <span class="title function_">jit_elementDef2</span>(<span class="number">0</span>,<span class="literal">null</span>,<span class="literal">null</span>,<span class="number">1</span>,<span class="string">&#x27;span&#x27;</span>,...),</span><br><span class="line">          <span class="title function_">jit_textDef3</span>(<span class="literal">null</span>,[<span class="string">&#x27;I am &#x27;</span>,...])</span><br><span class="line">        ], </span><br><span class="line">        <span class="literal">null</span>,</span><br><span class="line">        <span class="keyword">function</span>(<span class="params">_ck,_v</span>) &#123;</span><br><span class="line">            <span class="keyword">var</span> _co = _v.<span class="property">component</span>;</span><br><span class="line">            <span class="keyword">var</span> currVal_0 = _co.<span class="property">name</span>;</span><br><span class="line">            <span class="title function_">_ck</span>(_v,<span class="number">1</span>,<span class="number">0</span>,currVal_0);</span><br></pre></td></tr></table></figure>
+
+<p>它描述了元件視圖的結構，並在實例化元件時使用。 <code>jit_viewDef1</code> 是對 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/view.ts#L23">viewDef</a> 函數的引用，該函數會建立視圖定義。</p>
+<p>視圖定義接收 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/types.ts#L105">視圖定義節點 (View definition nodes)</a> 作為參數，這些參數類似於 HTML 的結構，但也包含許多 Angular 特定的詳細資訊。 在上面的範例中，第一個節點 <code>jit_elementDef2</code> 是元素定義，第二個 <code>jit_textDef3</code> 是文字定義。 Angular 編譯器會產生許多不同的節點定義，並且與節點相關聯的類型會在 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/types.ts#L153">NodeFlags</a> 中設定。 我們稍後將看到 Angular 如何使用有關節點類型的資訊來決定如何處理更新。</p>
+<p>就本文而言，我們僅對元素和文字節點感興趣：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="keyword">enum</span> <span class="title class_">NodeFlags</span> &#123;</span><br><span class="line">    <span class="title class_">TypeElement</span> = <span class="number">1</span> &lt;&lt; <span class="number">0</span>, </span><br><span class="line">    <span class="title class_">TypeText</span> = <span class="number">1</span> &lt;&lt; <span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>讓我們簡單回顧一下它們。</p>
+<h3 id="元素定義-Element-definition"><a href="#元素定義-Element-definition" class="headerlink" title="元素定義 (Element definition)"></a>元素定義 (Element definition)</h3><p><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/types.ts#L235">元素定義</a> 是 Angular 為每個 HTML 元素產生的節點。 這種類型的元素也<a target="_blank" rel="noopener" href="https://angular.love/en/here-is-why-you-will-not-find-components-inside-angular/">為元件產生</a>。 元素節點可以包含其他元素節點和文字定義節點作為子節點，這反映在 <code>childCount</code> 屬性中。</p>
+<p>所有元素定義都由 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/element.ts#L56">elementDef</a> 函數產生，因此工廠中使用的 <code>jit_elementDef2</code> 引用了此函數。 元素定義採用一些通用參數：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">+------------------+-----------------------------------+</span><br><span class="line">|       名稱        |          描述            </span><br><span class="line">+------------------+-----------------------------------+</span><br><span class="line">| childCount       | 指定目前元素有多少個子節點      </span><br><span class="line">| namespaceAndName | <span class="variable constant_">HTML</span> 元素的名稱              </span><br><span class="line">| fixedAttrs       | 在元素上定義的屬性            </span><br><span class="line">+------------------+-----------------------------------+</span><br></pre></td></tr></table></figure>
+
+<p>以及其他特定於特定 Angular 功能的參數：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">+----------------------+--------------------------------+</span><br><span class="line">|         名稱         |          描述               </span><br><span class="line">+----------------------+--------------------------------+</span><br><span class="line">| matchedQueriesDsl    | 在查詢子節點時使用            </span><br><span class="line">| ngContentIndex       | 用於節點投射                      </span><br><span class="line">| bindings             | 用於 <span class="variable constant_">DOM</span> 和綁定屬性更新       </span><br><span class="line">| outputs, handleEvent | 用於事件傳播                    </span><br><span class="line">+----------------------+--------------------------------+</span><br></pre></td></tr></table></figure>
+
+<p>就本文而言，我們只對 bindings 參數感興趣。</p>
+<h3 id="文字定義-Text-definition"><a href="#文字定義-Text-definition" class="headerlink" title="文字定義 (Text definition)"></a>文字定義 (Text definition)</h3><p><a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/types.ts#L290">文字定義</a> 是 Angular 編譯器為每個 <a target="_blank" rel="noopener" href="https://developer.mozilla.org/en/docs/Web/API/Node/nodeType#Constants">文字節點</a> 產生的節點定義。 通常，這些是元素定義節點的子節點，就像我們範例中的情況一樣。 這是一個非常簡單的節點定義，由 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/text.ts#L12">textDef</a> 函數產生。 它以常數形式接收已剖析的表達式作為第二個參數。 例如，以下文字：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">h1</span>&gt;</span>Hello &#123;&#123;name&#125;&#125; and another &#123;&#123;prop&#125;&#125;<span class="tag">&lt;/<span class="name">h1</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>將剖析為一個陣列：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[<span class="string">&quot;Hello &quot;</span>, <span class="string">&quot; and another &quot;</span>, <span class="string">&quot;&quot;</span>]</span><br></pre></td></tr></table></figure>
+
+<p>然後使用它來產生正確的綁定：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">text</span>: <span class="string">&#x27;Hello&#x27;</span>,</span><br><span class="line">  <span class="attr">bindings</span>: [</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">name</span>: <span class="string">&#x27;name&#x27;</span>,</span><br><span class="line">      <span class="attr">suffix</span>: <span class="string">&#x27; and another &#x27;</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">name</span>: <span class="string">&#x27;prop&#x27;</span>,</span><br><span class="line">      <span class="attr">suffix</span>: <span class="string">&#x27;&#x27;</span></span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>並在髒檢查期間這樣評估：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">text</span><br><span class="line">+ context[bindings[<span class="number">0</span>][property]] + context[bindings[<span class="number">0</span>][suffix]]</span><br><span class="line">+ context[bindings[<span class="number">1</span>][property]] + context[bindings[<span class="number">1</span>][suffix]]</span><br></pre></td></tr></table></figure>
+
+<h3 id="節點定義綁定-Node-definition-bindings"><a href="#節點定義綁定-Node-definition-bindings" class="headerlink" title="節點定義綁定 (Node definition bindings)"></a>節點定義綁定 (Node definition bindings)</h3><p>Angular 使用 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/types.ts#L196">綁定</a> 來定義每個節點對元件類別屬性的相依性。 在變更偵測期間，每個綁定都會決定 Angular 應用於更新節點的操作類型，並提供內容資訊。 操作類型由 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/types.ts#L205">綁定旗標</a> 決定，對於 DOM 特定的操作，它構成了以下清單：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">+-----------------------+--------------------------+</span><br><span class="line">|         名稱          | 範本中的建構      |</span><br><span class="line">+-----------------------+--------------------------+</span><br><span class="line">| <span class="title class_">TypeElementAttribute</span>  | attr.<span class="property">name</span>                |</span><br><span class="line">| <span class="title class_">TypeElementClass</span>      | <span class="keyword">class</span>.<span class="property">name</span>               |</span><br><span class="line">| <span class="title class_">TypeElementStyle</span>      | style.<span class="property">name</span>               |</span><br><span class="line">+-----------------------+--------------------------+</span><br></pre></td></tr></table></figure>
+
+<p>元素和文字定義會根據編譯器識別的綁定旗標在內部建立這些綁定。 每種節點類型都有特定於綁定產生的不同邏輯。</p>
+<h2 id="更新渲染器"><a href="#更新渲染器" class="headerlink" title="更新渲染器"></a>更新渲染器</h2><p>我們最感興趣的是編譯器產生的工廠 <code>View_AComponent_0</code> 末尾列出的函數：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span>(<span class="params">_ck,_v</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> _co = _v.<span class="property">component</span>;</span><br><span class="line">    <span class="keyword">var</span> currVal_0 = _co.<span class="property">name</span>;</span><br><span class="line">    <span class="title function_">_ck</span>(_v,<span class="number">1</span>,<span class="number">0</span>,currVal_0);</span><br></pre></td></tr></table></figure>
+
+<p>此函數稱為 <code>updateRenderer</code>。 它接收兩個參數 <code>_ck</code> 和 <code>v</code>。 <code>_ck</code> 是 <code>check</code> 的縮寫，並引用函數 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/services.ts#L262">prodCheckAndUpdate</a>。 另一個參數是具有節點的元件視圖。 每次 <a target="_blank" rel="noopener" href="https://angular.love/en/everything-you-need-to-know-about-change-detection-in-angular/">當 Angular 對元件執行變更偵測時</a>，都會執行 <code>updateRenderer</code> 函數，並且該函數的參數由變更偵測機制提供。</p>
+<p><code>updateRenderer</code> 函數的主要任務是從元件實例中檢索綁定屬性的目前值，並呼叫 <code>_ck</code> 函數，傳遞視圖、節點索引和檢索到的值。 重要的是要了解，Angular 會單獨為每個視圖節點執行 DOM 更新 — 這就是為什麼需要節點索引的原因。 當檢查 <code>_ck</code> 引用的函數的參數清單時，可以清楚地看到它：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">prodCheckAndUpdateNode</span>(<span class="params"></span></span><br><span class="line"><span class="params">    <span class="attr">view</span>: <span class="title class_">ViewData</span>, </span></span><br><span class="line"><span class="params">    <span class="attr">nodeIndex</span>: <span class="built_in">number</span>, </span></span><br><span class="line"><span class="params">    <span class="attr">argStyle</span>: <span class="title class_">ArgumentType</span>, </span></span><br><span class="line"><span class="params">    <span class="attr">v0</span>?: <span class="built_in">any</span>, </span></span><br><span class="line"><span class="params">    <span class="attr">v1</span>?: <span class="built_in">any</span>, </span></span><br><span class="line"><span class="params">    <span class="attr">v2</span>?: <span class="built_in">any</span>,</span></span><br></pre></td></tr></table></figure>
+
+<p><code>nodeIndex</code> 是應執行變更偵測的視圖節點的索引。 如果你的範本中有多個表達式：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">h1</span>&gt;</span>Hello &#123;&#123;name&#125;&#125;<span class="tag">&lt;/<span class="name">h1</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">h1</span>&gt;</span>Hello &#123;&#123;age&#125;&#125;<span class="tag">&lt;/<span class="name">h1</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>編譯器將為 <code>updateRenderer</code> 函數產生以下主體：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> _co = _v.<span class="property">component</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 此處節點索引為 1，屬性為 `name`</span></span><br><span class="line"><span class="keyword">var</span> currVal_0 = _co.<span class="property">name</span>;</span><br><span class="line"><span class="title function_">_ck</span>(_v,<span class="number">1</span>,<span class="number">0</span>,currVal_0);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 此處節點索引為 4，綁定的屬性為 `age`</span></span><br><span class="line"><span class="keyword">var</span> currVal_1 = _co.<span class="property">age</span>;</span><br><span class="line"><span class="title function_">_ck</span>(_v,<span class="number">4</span>,<span class="number">0</span>,currVal_1);</span><br></pre></td></tr></table></figure>
+
+<h2 id="更新-DOM"><a href="#更新-DOM" class="headerlink" title="更新 DOM"></a>更新 DOM</h2><p>現在我們了解了 Angular 編譯器產生的所有特定物件，我們可以探索如何使用這些物件執行實際的 DOM 更新。</p>
+<p>我們在上面了解到，在變更偵測期間，<code>updateRenderer</code> 函數會傳遞 <code>_ck</code> 函數，而此參數引用 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/services.ts#L262">prodCheckAndUpdate</a>。 這是一個簡短的通用函數，它會進行一系列呼叫，最終執行 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/view.ts#L400">checkAndUpdateNodeInline</a> 函數。 當表達式計數超過 10 時，<a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/view.ts#L386">該函數有一個變體</a>。</p>
+<p><code>checkAndUpdateNode</code> 函數只是一個路由器，用於區分以下類型的視圖節點，並將檢查和更新委派給相應的函數：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">case</span> <span class="title class_">NodeFlags</span>.<span class="property">TypeElement</span>   -&gt; checkAndUpdateElementInline</span><br><span class="line"><span class="keyword">case</span> <span class="title class_">NodeFlags</span>.<span class="property">TypeText</span>      -&gt; checkAndUpdateTextInline</span><br><span class="line"><span class="keyword">case</span> <span class="title class_">NodeFlags</span>.<span class="property">TypeDirective</span> -&gt; checkAndUpdateDirectiveInline</span><br></pre></td></tr></table></figure>
+
+<p>現在讓我們看看這些函數的作用。 有關 <code>NodeFlags.TypeDirective</code>，請參閱<a target="_blank" rel="noopener" href="https://angular.love/en/the-mechanics-of-property-bindings-update-in-angular/">Angular 中屬性綁定更新的機制</a>。</p>
+<h3 id="元素類型-Type-Element"><a href="#元素類型-Type-Element" class="headerlink" title="元素類型 (Type Element)"></a>元素類型 (Type Element)</h3><p>它使用函數 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/element.ts#L229">CheckAndUpdateElement</a>。 該函數基本上會檢查綁定是否為 Angular 特殊形式 <code>[attr.name, class.name, style.some]</code> 或某些節點特定的屬性。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">case</span> <span class="title class_">BindingFlags</span>.<span class="property">TypeElementAttribute</span> -&gt; setElementAttribute</span><br><span class="line"><span class="keyword">case</span> <span class="title class_">BindingFlags</span>.<span class="property">TypeElementClass</span>     -&gt; setElementClass</span><br><span class="line"><span class="keyword">case</span> <span class="title class_">BindingFlags</span>.<span class="property">TypeElementStyle</span>     -&gt; setElementStyle</span><br><span class="line"><span class="keyword">case</span> <span class="title class_">BindingFlags</span>.<span class="property">TypeProperty</span>         -&gt; setElementProperty;</span><br></pre></td></tr></table></figure>
+
+<p>相應的函數只是使用渲染器的相應方法來對節點執行所需的操作。</p>
+<h3 id="文字類型-Type-Text"><a href="#文字類型-Type-Text" class="headerlink" title="文字類型 (Type Text)"></a>文字類型 (Type Text)</h3><p>它在兩種變體中使用函數 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/15090a8ad4a23dbe947ec48b581f1bf6a2da411e/packages/core/src/view/text.ts#L62">CheckAndUpdateText</a>。 以下是該函數的要旨：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (<span class="title function_">checkAndUpdateBinding</span>(view, nodeDef, bindingIndex, newValue)) &#123;</span><br><span class="line">    value = text + <span class="title function_">_addInterpolationPart</span>(...);</span><br><span class="line">    view.<span class="property">renderer</span>.<span class="title function_">setValue</span>(<span class="title class_">DOMNode</span>, value);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它基本上會取得從 <code>updateRenderer</code> 函數傳遞的目前值，並將其與上次變更偵測的值進行比較。 視圖會在 <a target="_blank" rel="noopener" href="https://github.com/angular/angular/blob/6b79ab5abec8b5a4b43d563ce65f032990b3e3bc/packages/core/src/view/types.ts#L318">oldValues</a> 屬性中保留舊值。 如果值已變更，Angular 會使用更新的值來組成字串，並使用渲染器更新 DOM。</p>
+<h2 id="結論"><a href="#結論" class="headerlink" title="結論"></a>結論</h2><p>我確信這是一個難以承受的大量資訊。 但是透過了解它，你在設計應用程式或偵錯與 DOM 更新相關的問題時會更好。 我建議你也使用偵錯工具並遵循本文中說明的執行邏輯。</p>
+
+      
+    </div>
+      
+      <footer>
+        
+        
+        
+  <div class="addthis addthis_toolbox addthis_default_style">
+    
+      <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    
+    
+      <a class="addthis_button_tweet"></a>
+    
+    
+      <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    
+    
+      <a class="addthis_button_pinterest_pinit" pi:pinit:layout="horizontal"></a>
+    
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js"></script>
+
+      
+      <div class="clearfix"></div>
+      </footer>
+  </div>
+</article>
+
+
+<section id="comment">
+  
+</section>
+
+
+</div></div>
+    <aside id="sidebar" class="alignright">
+  <div class="search">
+  <form action="//google.com/search" method="get" accept-charset="utf-8">
+    <input type="search" name="q" results="0" placeholder="搜尋">
+    <input type="hidden" name="q" value="site:viaje9.github.io">
+  </form>
+</div>
+
+  
+<div class="widget tag">
+  <h3 class="title">最新文章</h3>
+  <ul class="entry">
+    
+      <li>
+        <a href="/TranslationKonjac/2025/04/05/zh-tw-How-to-Get-Rich/">如何致富（不靠運氣）</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/02/17/zh-tw-change-detection-and-component-trees-in-angular-applications/">Angular 應用程式中的變更偵測與元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/20/zh-tw-local-change-detection-and-angular-signals-in-templates-in-details/">局部變更偵測與 Angular Signals 在模板中的詳細應用</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/19/zh-tw-running-change-detection-components-tree/">執行變更偵測 – 元件樹</a>
+      </li>
+    
+      <li>
+        <a href="/TranslationKonjac/2025/01/13/zh-tw-change-detection-big-picture-unidirectional-data-flow/">變更偵測大觀 – 單向數據流</a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+  
+</aside>
+    <div class="clearfix"></div>
+  </div>
+  <footer id="footer" class="inner"><div class="alignleft">
+  
+  &copy; 2025 Brian
+  
+</div>
+<div class="clearfix"></div></footer>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+
+</body>
+</html>
+
