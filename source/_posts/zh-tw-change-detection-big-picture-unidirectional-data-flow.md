@@ -1,5 +1,5 @@
 ---
-title: Change Detection Big Picture – Unidirectional data flow
+title: 變更偵測大觀 – 單向數據流
 date: 2025-01-13 21:43:04
 tags:
 ---

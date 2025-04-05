@@ -1,5 +1,5 @@
 ---
-title: A change detection, zone.js, zoneless, local change detection, and signals story 📚
+title: 一個關於變更偵測、zone.js、無 Zone、局部變更偵測和 Signals 的故事 📚
 tags:
 ---
 

@@ -1,5 +1,5 @@
 ---
-title: A gentle introduction into change detection in Angular
+title: Angular 變更偵測的入門介紹
 date: 2025-01-04 16:33:14
 tags:
 ---

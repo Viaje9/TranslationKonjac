@@ -1,5 +1,5 @@
 ---
-title: Change Detection Big Picture – Operations
+title: 變更偵測大觀 – 運算
 date: 2025-01-04 21:20:43
 tags:
 ---

@@ -1,5 +1,5 @@
 ---
-title: Change detection and component trees in Angular applications
+title: Angular 應用程式中的變更偵測與元件樹
 date: 2025-02-17 16:26:07
 tags:
 ---

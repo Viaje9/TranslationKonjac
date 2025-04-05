@@ -1,5 +1,5 @@
 ---
-title: The mechanics of DOM updates in Angular
+title: Angular 中 DOM 更新的機制
 date: 2025-01-04 17:10:03
 tags:
 ---

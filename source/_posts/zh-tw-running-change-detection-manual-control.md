@@ -1,5 +1,5 @@
 ---
-title: Running change detection – Manual control
+title: 執行變更偵測 – 手動控制
 date: 2025-01-04 20:57:03
 tags:
 ---

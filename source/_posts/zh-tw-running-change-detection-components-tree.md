@@ -1,5 +1,5 @@
 ---
-title: Running change detection – Components tree
+title: 執行變更偵測 – 元件樹
 date: 2025-01-19 15:40:20
 tags:
 ---

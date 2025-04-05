@@ -1,5 +1,5 @@
 ---
-title: He who thinks change detection is depth-first and he who thinks it’s breadth-first are both usually right
+title: 認為變更偵測是深度優先與廣度優先的人通常都是對的
 date: 2025-01-13 16:40:56
 tags:
 ---

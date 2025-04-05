@@ -1,5 +1,5 @@
 ---
-title: I reverse-engineered Zones (zone.js) and here is what I’ve found
+title: 我對 Zones (zone.js) 進行了反向工程，這是我的發現
 date: 2024-12-31 17:01:14
 tags:
 ---

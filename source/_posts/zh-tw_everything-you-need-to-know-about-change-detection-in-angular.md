@@ -1,5 +1,5 @@
 ---
-title: Everything you need to know about change detection in Angular
+title: 關於 Angular 中變更偵測你需要知道的一切
 date: 2025-01-04 15:50:14
 tags:
 ---

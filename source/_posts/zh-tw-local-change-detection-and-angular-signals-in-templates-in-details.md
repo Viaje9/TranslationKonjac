@@ -1,5 +1,5 @@
 ---
-title: Local change detection and Angular Signals in templates in details
+title: 局部變更偵測與 Angular Signals 在模板中的詳細應用
 date: 2025-01-20 17:11:56
 tags:
 ---

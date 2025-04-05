@@ -1,5 +1,5 @@
 ---
-title: The Latest in Angular Change Detection – All You Need to Know
+title: Angular 最新的變更偵測 – 所有你需要知道的
 date: 2024-12-24 18:40:14
 tags:
 ---

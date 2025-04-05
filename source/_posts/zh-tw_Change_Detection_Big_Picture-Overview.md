@@ -1,5 +1,5 @@
 ---
-title: Change Detection Big Picture – Overview
+title: 變更偵測大觀 – 總覽
 date: 2024-12-31 17:08:14
 tags:
 ---
